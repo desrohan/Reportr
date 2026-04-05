@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Reportr",
+  "version": "1.0.0",
+  "description": "Capture bugs and user interactions seamlessly.",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "scripting",
+    "tabCapture",
+    "offscreen",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/monkeypatch.ts"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/recorder.ts"],
+      "world": "ISOLATED",
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "icons": {
+    "16": "favicon.svg",
+    "48": "favicon.svg",
+    "128": "favicon.svg"
+  }
+}
