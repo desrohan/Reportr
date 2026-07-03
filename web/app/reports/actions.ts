@@ -9,9 +9,9 @@ export async function saveReport(data: {
   events: any[];
 }) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     throw new Error('Not authenticated')
   }
 
@@ -20,7 +20,7 @@ export async function saveReport(data: {
     .from('reports')
     .insert({
       workspace_id: data.workspaceId,
-      created_by: session.user.id,
+      created_by: user.id,
       title: data.title || 'Untitled Recording',
       video_url: data.videoUrl,
       status: 'ready'

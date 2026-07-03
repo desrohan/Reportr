@@ -5,11 +5,11 @@ import { LoginButton } from './components/LoginButton'
 export default async function LandingPage() {
   const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
+    data: { user },
+  } = await supabase.auth.getUser()
 
   // Auto-redirect if already logged in!
-  if (session) {
+  if (user) {
     redirect('/dashboard')
   }
 

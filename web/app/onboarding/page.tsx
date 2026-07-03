@@ -8,9 +8,9 @@ export default async function OnboardingPage({
   searchParams: Promise<{ code?: string; invite_code?: string }>
 }) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     redirect('/')
   }
 
@@ -18,7 +18,7 @@ export default async function OnboardingPage({
   const { data: workspaces } = await supabase
     .from('workspace_members')
     .select('workspace_id')
-    .eq('user_id', session.user.id)
+    .eq('user_id', user.id)
     .limit(1)
 
   // Extract invite code from search params (supports ?code=xxx or ?invite_code=xxx)
@@ -30,7 +30,7 @@ export default async function OnboardingPage({
     redirect('/dashboard')
   }
 
-  const fullName = session.user.user_metadata?.full_name || 'Personal'
+  const fullName = user.user_metadata?.full_name || 'Personal'
   const defaultOrgName = `${fullName.split(' ')[0]}'s Organization`
 
   return (

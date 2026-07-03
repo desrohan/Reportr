@@ -9,9 +9,9 @@ export async function createWorkspace(formData: FormData) {
   if (!name || name.trim() === '') return
 
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  if (!session) {
+  if (!user) {
     redirect('/')
   }
 
@@ -23,7 +23,7 @@ export async function createWorkspace(formData: FormData) {
     .insert({
       name: name.trim(),
       invite_code: inviteCode,
-      created_by: session.user.id
+      created_by: user.id
     })
     .select('id')
     .single()
@@ -37,7 +37,7 @@ export async function createWorkspace(formData: FormData) {
     .from('workspace_members')
     .insert({
       workspace_id: workspace.id,
-      user_id: session.user.id,
+      user_id: user.id,
       role: 'owner'
     })
 

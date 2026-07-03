@@ -6,10 +6,10 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
   const code = (await params).code
   
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { user } } = await supabase.auth.getUser()
 
   // 1. If not signed in, redirect to login with a next parameter
-  if (!session) {
+  if (!user) {
     redirect(`/login?next=/invite/${code}`)
   }
 
