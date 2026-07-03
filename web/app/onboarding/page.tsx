@@ -1,8 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../../utils/supabase/server'
-import { createWorkspace } from './actions'
+import { OnboardingForm } from './OnboardingForm'
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams
+}: {
+  searchParams: Promise<{ code?: string; invite_code?: string }>
+}) {
   const supabase = await createClient()
   const { data: { session } } = await supabase.auth.getSession()
 
@@ -17,7 +21,12 @@ export default async function OnboardingPage() {
     .eq('user_id', session.user.id)
     .limit(1)
 
-  if (workspaces && workspaces.length > 0) {
+  // Extract invite code from search params (supports ?code=xxx or ?invite_code=xxx)
+  const resolvedParams = await searchParams
+  const code = resolvedParams.code || resolvedParams.invite_code || ''
+
+  // If they already have a workspace, and didn't explicitly request to join/create (no code in URL), redirect to dashboard
+  if (workspaces && workspaces.length > 0 && !code) {
     redirect('/dashboard')
   }
 
@@ -26,35 +35,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-2xl backdrop-blur-xl">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-zinc-100">Create your Workspace</h2>
-          <p className="mt-2 text-sm text-zinc-400">Let's get your organization set up to store bug reports.</p>
-        </div>
-
-        <form action={createWorkspace} className="mt-8 space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-zinc-300">
-              Workspace Name
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              required
-              defaultValue={defaultOrgName}
-              className="mt-2 block w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 placeholder-zinc-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm transition-colors"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="group relative flex w-full justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-indigo-500 active:scale-[0.98]"
-          >
-            Create Organization
-          </button>
-        </form>
-      </div>
+      <OnboardingForm defaultOrgName={defaultOrgName} initialInviteCode={code} />
     </div>
   )
 }

@@ -11,10 +11,13 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
+    const searchParams = new URLSearchParams(window.location.search)
+    const next = searchParams.get('next') || '/dashboard'
+
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${location.origin}/auth/callback`
+        redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(next)}`
       }
     })
     setIsLoading(false)

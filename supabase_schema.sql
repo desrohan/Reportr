@@ -6,6 +6,7 @@ create table public.workspaces (
   id uuid default uuid_generate_v4() primary key,
   name text not null,
   invite_code text unique not null,
+  created_by uuid references auth.users(id),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -40,14 +41,25 @@ create table public.report_events (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- Row Level Security (RLS)
+-- Security definer helper to bypass RLS recursion
+create or replace function public.get_workspaces_for_user(usr_id uuid)
+returns setof uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select workspace_id from public.workspace_members where user_id = usr_id;
+$$;
 
 -- Workspaces: Members can view
 alter table public.workspaces enable row level security;
 create policy "Users can view workspaces they are members of" on public.workspaces
   for select using (
-    id in (select workspace_id from public.workspace_members where user_id = auth.uid())
+    id in (select public.get_workspaces_for_user(auth.uid()))
   );
+create policy "Users can view workspaces they created" on public.workspaces
+  for select using (auth.uid() = created_by);
 -- Anyone can create a workspace
 create policy "Users can create workspaces" on public.workspaces
   for insert with check (auth.uid() is not null);
@@ -56,7 +68,7 @@ create policy "Users can create workspaces" on public.workspaces
 alter table public.workspace_members enable row level security;
 create policy "Members can view other members" on public.workspace_members
   for select using (
-    workspace_id in (select workspace_id from public.workspace_members where user_id = auth.uid())
+    workspace_id in (select public.get_workspaces_for_user(auth.uid()))
   );
 create policy "Users can join a workspace" on public.workspace_members
   for insert with check (auth.uid() = user_id);

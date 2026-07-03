@@ -27,6 +27,12 @@
       "js": ["src/content/recorder.ts"],
       "world": "ISOLATED",
       "run_at": "document_start"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/authSync.ts"],
+      "world": "ISOLATED",
+      "run_at": "document_start"
     }
   ],
   "background": {
