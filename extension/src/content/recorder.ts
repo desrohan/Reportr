@@ -360,10 +360,15 @@ function startAreaSelection() {
     document.body.removeChild(overlay);
 
     if (w > 5 && h > 5) {
-      chrome.runtime.sendMessage({
-        action: 'selectionDone',
-        box: { x, y, w, h }
-      });
+      // Wait two frames so the overlay removal actually paints before the
+      // background captures the tab — otherwise the blue selection tint and
+      // dimming overlay end up baked into the screenshot.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        chrome.runtime.sendMessage({
+          action: 'selectionDone',
+          box: { x, y, w, h }
+        });
+      }));
     }
   };
 

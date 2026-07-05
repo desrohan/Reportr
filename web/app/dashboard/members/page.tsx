@@ -1,5 +1,6 @@
 import { createClient } from '../../../utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 
 interface Member {
@@ -60,6 +61,15 @@ export default async function TeamMembersPage({
 
   const workspaceName = workspace?.name || 'Workspace'
 
+  // This is a Server Component, so `window` isn't available — derive the real
+  // origin from the request headers so the invite link isn't a hardcoded
+  // localhost fallback (works on both local and production).
+  const headersList = await headers()
+  const host = headersList.get('host') || 'localhost:3000'
+  const proto = headersList.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
+  const origin = `${proto}://${host}`
+  const inviteUrl = workspace?.invite_code ? `${origin}/invite/${workspace.invite_code}` : ''
+
   return (
     <div className="flex-1 overflow-y-auto bg-zinc-900 p-8 text-zinc-100">
       <div className="mx-auto max-w-4xl space-y-8">
@@ -82,7 +92,7 @@ export default async function TeamMembersPage({
             <div className="flex items-center gap-2 max-w-md w-full md:w-auto">
               <input
                 readOnly
-                value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/invite/${workspace.invite_code}`}
+                value={inviteUrl}
                 className="rounded-xl border border-zinc-800 bg-zinc-900 px-3.5 py-2 text-xs text-zinc-300 outline-none w-full md:w-80 truncate"
               />
             </div>
