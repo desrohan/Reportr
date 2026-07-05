@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../utils/supabase/server'
 import { LoginButton } from './components/LoginButton'
+import { AuthSync } from './dashboard/AuthSync'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -15,6 +16,7 @@ export default async function LandingPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
+      <AuthSync session={null} />
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-2xl backdrop-blur-xl">
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/20">

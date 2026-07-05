@@ -10,7 +10,8 @@
     "scripting",
     "tabCapture",
     "offscreen",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "desktopCapture"
   ],
   "host_permissions": [
     "<all_urls>"

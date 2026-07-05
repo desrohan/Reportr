@@ -4,12 +4,20 @@ import { useState } from 'react'
 import { regenerateInviteCode } from './actions'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { createClient } from '../../utils/supabase/client'
 
 export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { workspaces: any[], user: any }) {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces)
+  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 
   const urlWorkspaceId = searchParams.get('workspace_id')
   const activeWorkspaceId = urlWorkspaceId && workspaces.some(w => w.id === urlWorkspaceId)
@@ -144,14 +152,37 @@ export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { work
         </nav>
       </div>
 
-      <div className="flex items-center gap-3 border-t border-zinc-800 pt-4 px-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-sm font-medium text-white">
-          {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-        </div>
-        <div className="overflow-hidden">
-          <p className="truncate text-sm font-medium text-zinc-200">{user.user_metadata?.full_name || 'User'}</p>
-          <p className="truncate text-xs text-zinc-500">{user.email}</p>
-        </div>
+      <div className="relative border-t border-zinc-800 pt-4">
+        {showProfileMenu && (
+          <div className="absolute bottom-full left-0 right-0 mb-2 py-1 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50">
+            <button
+              onClick={handleLogout}
+              className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 hover:text-red-300 transition-colors flex items-center gap-2 cursor-pointer font-semibold"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Log Out
+            </button>
+          </div>
+        )}
+        <button 
+          onClick={() => setShowProfileMenu(!showProfileMenu)}
+          className="w-full flex items-center gap-3 text-left px-2 py-1.5 rounded-xl hover:bg-zinc-900/60 transition-colors cursor-pointer focus:outline-none"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-sm font-semibold text-white shrink-0">
+            {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+          </div>
+          <div className="overflow-hidden flex-1">
+            <p className="truncate text-sm font-semibold text-zinc-200">{user.user_metadata?.full_name || 'User'}</p>
+            <p className="truncate text-xs text-zinc-500">{user.email}</p>
+          </div>
+          <div className="text-zinc-500 pr-1 shrink-0">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01" />
+            </svg>
+          </div>
+        </button>
       </div>
     </aside>
   )

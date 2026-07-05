@@ -10,12 +10,25 @@ window.addEventListener('message', (event) => {
       chrome.runtime.sendMessage({
         target: 'background',
         type: 'auth-sync',
-        data: { session }
+        data: { session, origin: window.location.origin }
       }, () => {
         if (chrome.runtime.lastError) {
           console.warn('[Reportr AuthSync] Extension background not receiving:', chrome.runtime.lastError.message);
         } else {
           console.log('[Reportr AuthSync] Session synced to extension successfully.');
+        }
+      });
+    } else if (session === null) {
+      // User is logged out, clear extension session
+      chrome.runtime.sendMessage({
+        target: 'background',
+        type: 'auth-sync',
+        data: { session: null }
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.warn('[Reportr AuthSync] Failed to sync signout:', chrome.runtime.lastError.message);
+        } else {
+          console.log('[Reportr AuthSync] Signout synced to extension successfully.');
         }
       });
     }

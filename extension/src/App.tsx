@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Camera, StopCircle, RefreshCw, MonitorPlay, Focus, Image as ImageIcon, AppWindow, ShieldAlert, Monitor } from 'lucide-react';
+import { DEFAULT_BACKEND_URL } from './config';
 import './App.css';
 import './index.css';
 
@@ -7,6 +8,7 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [isValidating, setIsValidating] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   
   // UI States
   const [activeTab, setActiveTab] = useState<'capture' | 'record'>('record');
@@ -18,20 +20,30 @@ export default function App() {
   useEffect(() => {
     // Check initial recording state and Auth session
     chrome.storage.local.get(['reportr_session'], (result) => {
-      if (result.reportr_session) {
-        const sessionData = result.reportr_session as any;
+      const sessionData = result.reportr_session as any;
+      if (sessionData) {
         setSession(sessionData);
         if (sessionData.workspaces && sessionData.workspaces.length > 0) {
           setActiveWorkspace(sessionData.workspaces[0].id);
         }
       }
-      
+
       chrome.runtime.sendMessage({ action: 'getStatus' }, (response) => {
         if (response) {
           setIsRecording(response.isRecording);
         }
-        setIsValidating(false);
       });
+
+      if (sessionData) {
+        // Ask the background whether the token is still valid (it will silently
+        // refresh if it can). If not, we surface a sign-in prompt.
+        chrome.runtime.sendMessage({ action: 'checkAuth' }, (res) => {
+          setSessionExpired(!(res && res.valid));
+          setIsValidating(false);
+        });
+      } else {
+        setIsValidating(false);
+      }
     });
   }, []);
 
@@ -39,7 +51,11 @@ export default function App() {
     // We send activeWorkspace back if we want background.ts to use it
     // Right now, background.ts assumes the DB upload will use active context.
     // For now, let's just start recording.
-    chrome.runtime.sendMessage({ action: 'startRecording', workspaceId: activeWorkspace }, (response) => {
+    chrome.runtime.sendMessage({ 
+      action: 'startRecording', 
+      workspaceId: activeWorkspace,
+      recordMode: recordMode
+    }, (response) => {
       if (response && response.status === 'started') {
         setIsRecording(true);
       }
@@ -51,8 +67,17 @@ export default function App() {
     setIsRecording(false);
   };
 
+  const handleCapture = (type: 'visible' | 'full' | 'selected') => {
+    chrome.runtime.sendMessage({
+      action: 'startCapture',
+      captureType: type,
+      workspaceId: activeWorkspace
+    });
+    window.close();
+  };
+
   const openWebLogin = () => {
-    chrome.tabs.create({ url: 'http://localhost:3000' });
+    chrome.tabs.create({ url: DEFAULT_BACKEND_URL });
   };
 
   if (isValidating) {
@@ -63,21 +88,28 @@ export default function App() {
     );
   }
 
-  // --- Unauthenticated State ---
-  if (!session) {
+  // --- Unauthenticated / Expired State ---
+  if (!session || sessionExpired) {
+    const expired = !!session && sessionExpired;
     return (
       <div className="w-[360px] h-[520px] bg-white flex flex-col justify-center items-center px-6 text-center">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 shadow-lg shadow-indigo-100">
           <MonitorPlay className="text-indigo-600" size={32} />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 mb-2">Welcome to Reportr</h1>
-        <p className="text-sm text-zinc-500 mb-8 leading-relaxed">Please sign in to your Reportr dashboard to connect your workspace.</p>
-        
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 mb-2">
+          {expired ? 'Session expired' : 'Welcome to Reportr'}
+        </h1>
+        <p className="text-sm text-zinc-500 mb-8 leading-relaxed">
+          {expired
+            ? 'Your session expired. Open the dashboard to reconnect — recordings will upload automatically after that.'
+            : 'Please sign in to your Reportr dashboard to connect your workspace.'}
+        </p>
+
         <button
           onClick={openWebLogin}
           className="w-full bg-blue-500 hover:bg-blue-600 active:scale-[0.98] transition-all py-3 px-4 rounded-xl text-white font-semibold text-sm shadow-md"
         >
-          Sign In to Reportr
+          {expired ? 'Open Dashboard' : 'Sign In to Reportr'}
         </button>
       </div>
     );
@@ -135,7 +167,7 @@ export default function App() {
                 className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${recordMode === 'desktop' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-zinc-100 bg-white text-zinc-500 hover:border-zinc-200'}`}
               >
                 <Monitor size={28} />
-                <span className="text-xs font-semibold">Desktop (Soon)</span>
+                <span className="text-xs font-semibold">Desktop</span>
               </button>
               <button
                 onClick={() => setRecordMode('this-tab')}
@@ -176,15 +208,24 @@ export default function App() {
 
         {activeTab === 'capture' && (
           <div className="flex flex-col gap-3 flex-1 justify-center">
-            <button className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm">
+            <button 
+              onClick={() => handleCapture('visible')}
+              className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm cursor-pointer"
+            >
                <ImageIcon size={20} className="text-zinc-500" />
                <span className="font-medium text-sm">Visible Part</span>
             </button>
-            <button className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm">
+            <button 
+              onClick={() => handleCapture('full')}
+              className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm cursor-pointer"
+            >
                <MonitorPlay size={20} className="text-zinc-500" />
                <span className="font-medium text-sm">Full Page</span>
             </button>
-            <button className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm">
+            <button 
+              onClick={() => handleCapture('selected')}
+              className="flex items-center gap-3 p-4 border border-zinc-200 rounded-xl text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition-all shadow-sm cursor-pointer"
+            >
                <Focus size={20} className="text-zinc-500" />
                <span className="font-medium text-sm">Selected Area</span>
             </button>
@@ -213,7 +254,7 @@ export default function App() {
             </button>
           )
         ) : (
-           <p className="text-center text-xs text-zinc-400 py-2">Capture options coming soon</p>
+          <p className="text-center text-xs text-zinc-400 py-2">Select an option above to capture screenshot</p>
         )}
       </div>
 

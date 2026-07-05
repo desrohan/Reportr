@@ -280,6 +280,11 @@ export function ReportReplayViewer({
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const isImage = useMemo(() => {
+    const url = localVideoBase64 || videoUrl || '';
+    return url.startsWith('data:image/') || url.includes('.png') || url.includes('.jpg') || url.includes('.jpeg') || url.includes('screenshot.png');
+  }, [videoUrl, localVideoBase64]);
+
   // Seek to hash timestamp on load
   useEffect(() => {
     if (typeof window === "undefined" || !videoRef.current) return;
@@ -460,15 +465,20 @@ export function ReportReplayViewer({
         <div style={{ flex: "0 0 60%", background: "#0d0d0d", display: "flex",
                       alignItems: "center", justifyContent: "center" }}>
           {(videoUrl || localVideoBase64) ? (
-            <video ref={videoRef} src={localVideoBase64 || videoUrl} controls
-                   onTimeUpdate={e => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
-                   style={{ width: "100%", maxHeight: "100%", display: "block" }} />
+            isImage ? (
+              <img src={localVideoBase64 || videoUrl} alt="Screenshot Capture"
+                   style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block" }} />
+            ) : (
+              <video ref={videoRef} src={localVideoBase64 || videoUrl} controls
+                     onTimeUpdate={e => setCurrentTime((e.target as HTMLVideoElement).currentTime)}
+                     style={{ width: "100%", maxHeight: "100%", display: "block" }} />
+            )
           ) : (
             <div style={{ textAlign: "center", color: "#666" }}>
               <div style={{ width: 40, height: 40, margin: "0 auto 12px",
                             border: "3px solid #333", borderTopColor: "#fff",
                             borderRadius: "50%", animation: "spin .7s linear infinite" }} />
-              <p style={{ fontSize: 13 }}>Processing video…</p>
+              <p style={{ fontSize: 13 }}>Processing media…</p>
             </div>
           )}
         </div>

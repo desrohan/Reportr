@@ -85,6 +85,7 @@ create policy "Members can insert reports" on public.reports
     and auth.uid() = created_by
   );
 
+
 -- Report Events: Members can view and insert
 alter table public.report_events enable row level security;
 create policy "Members can view report events" on public.report_events
@@ -95,3 +96,4 @@ create policy "Members can insert report events" on public.report_events
   for insert with check (
     report_id in (select id from public.reports where workspace_id in (select workspace_id from public.workspace_members where user_id = auth.uid()))
   );
+

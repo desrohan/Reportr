@@ -11,12 +11,14 @@ interface RawEvent {
 }
 
 interface ReportDraft {
-  status: "uploading" | "ready";
+  status: "uploading" | "ready" | "error";
   videoUrl?: string;
   localVideoBase64?: string;
   events?: RawEvent[];
   recordingStartedAt?: number;
   workspaceId?: string;
+  error?: string;
+  authRequired?: boolean;
 }
 
 function useDraft(draftId: string | null) {
@@ -36,7 +38,10 @@ function useDraft(draftId: string | null) {
       if (ev.data.draft) {
         setDraft(ev.data.draft as ReportDraft);
         setMissing(false);
-        if (ev.data.draft.status === "ready") ready.current = true;
+        // Stop polling once the draft reaches a terminal state.
+        if (ev.data.draft.status === "ready" || ev.data.draft.status === "error") {
+          ready.current = true;
+        }
       } else {
         setMissing(true);
       }
@@ -82,6 +87,35 @@ function NewReportInner() {
           <p style={{ fontSize: 13, color: "#6b7280" }}>
             Make sure the Reportr extension is installed and this page was opened by the extension.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (draft?.status === "error") {
+    const authRequired = draft.authRequired;
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center",
+                    justifyContent: "center", background: "#fff", fontFamily: "system-ui" }}>
+        <div style={{ textAlign: "center", maxWidth: 380 }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>{authRequired ? "🔒" : "⚠️"}</div>
+          <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+            {authRequired ? "Session expired" : "Recording failed"}
+          </h1>
+          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: authRequired ? 20 : 0, lineHeight: 1.5 }}>
+            {draft.error || "The screen capture didn't start, so nothing was recorded. Please try recording again."}
+            {authRequired && " Your recording is saved locally — sign in, then record again to upload."}
+          </p>
+          {authRequired && (
+            <a
+              href="/dashboard"
+              style={{ display: "inline-block", background: "#2563eb", color: "#fff",
+                       fontSize: 14, fontWeight: 600, padding: "10px 20px", borderRadius: 10,
+                       textDecoration: "none" }}
+            >
+              Sign in
+            </a>
+          )}
         </div>
       </div>
     );
