@@ -6,6 +6,7 @@ export async function saveReport(data: {
   workspaceId: string;
   title: string;
   videoUrl: string;
+  thumbnailUrl?: string;
   events: any[];
 }) {
   const supabase = await createClient()
@@ -23,6 +24,7 @@ export async function saveReport(data: {
       created_by: user.id,
       title: data.title || 'Untitled Recording',
       video_url: data.videoUrl,
+      thumbnail_url: data.thumbnailUrl || null,
       status: 'ready'
     })
     .select('id')

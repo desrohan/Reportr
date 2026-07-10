@@ -98,7 +98,7 @@ export async function POST(req: Request) {
 
     const S3 = new S3Client({
       region: "auto",
-      endpoint: endpoint,
+      endpoint: cleanR2Endpoint(endpoint),
       credentials: {
         accessKeyId: accessKeyId,
         secretAccessKey: secretAccessKey,
@@ -128,7 +128,8 @@ export async function POST(req: Request) {
       }
     } else {
       // Fallback if no public domain is specified
-      publicUrl = `${endpoint}/${bucketName}/${key}`;
+      const cleanedEndpoint = cleanR2Endpoint(endpoint);
+      publicUrl = `${cleanedEndpoint}/${bucketName}/${key}`;
     }
 
     return NextResponse.json({ uploadUrl: preSignedUrl, key, publicUrl });
@@ -136,4 +137,20 @@ export async function POST(req: Request) {
     console.error("Presigned URL Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function cleanR2Endpoint(endpoint: string): string {
+  if (!endpoint) return "";
+  let cleaned = endpoint.trim();
+  if (!/^https?:\/\//i.test(cleaned)) {
+    cleaned = "https://" + cleaned;
+  }
+  try {
+    const url = new URL(cleaned);
+    if (url.hostname.endsWith(".r2.cloudflarestorage.com")) {
+      return `${url.protocol}//${url.hostname}`;
+    }
+    return url.href.replace(/\/$/, "");
+  } catch (_) {}
+  return endpoint.trim();
 }

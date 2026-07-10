@@ -34,7 +34,7 @@ export async function saveWorkspaceR2Settings(
   const { error } = await supabase
     .from('workspaces')
     .update({
-      r2_endpoint: data.r2_endpoint?.trim() || null,
+      r2_endpoint: cleanR2Endpoint(data.r2_endpoint) || null,
       r2_access_key_id: data.r2_access_key_id?.trim() || null,
       r2_secret_access_key: data.r2_secret_access_key?.trim() || null,
       r2_bucket_name: data.r2_bucket_name?.trim() || null,
@@ -88,7 +88,7 @@ export async function savePersonalR2Settings(
       .from('user_r2_settings')
       .upsert({
         user_id: user.id,
-        r2_endpoint: data.r2_endpoint?.trim() || null,
+        r2_endpoint: cleanR2Endpoint(data.r2_endpoint) || null,
         r2_access_key_id: data.r2_access_key_id?.trim() || null,
         r2_secret_access_key: data.r2_secret_access_key?.trim() || null,
         r2_bucket_name: data.r2_bucket_name?.trim() || null,
@@ -104,4 +104,20 @@ export async function savePersonalR2Settings(
 
   revalidatePath(`/dashboard/settings`)
   return { success: true }
+}
+
+function cleanR2Endpoint(endpoint: string): string {
+  if (!endpoint) return "";
+  let cleaned = endpoint.trim();
+  if (!/^https?:\/\//i.test(cleaned)) {
+    cleaned = "https://" + cleaned;
+  }
+  try {
+    const url = new URL(cleaned);
+    if (url.hostname.endsWith(".r2.cloudflarestorage.com")) {
+      return `${url.protocol}//${url.hostname}`;
+    }
+    return url.href.replace(/\/$/, "");
+  } catch (_) {}
+  return endpoint.trim();
 }

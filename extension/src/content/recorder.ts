@@ -427,31 +427,53 @@ async function runFullPageCapture(workspaceId: string | null) {
   canvas.width = viewportWidth * dpr;
   canvas.height = totalHeight * dpr;
   const ctx = canvas.getContext('2d');
+  // Fill white first so any chunk we still fail to capture reads as blank page,
+  // not an alarming transparent/black band.
+  if (ctx) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
   let currentScroll = 0;
   const chunks: { dataUrl: string, y: number }[] = [];
 
   const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  // Loop through and capture each viewport chunk
+  // Loop through and capture each viewport chunk.
+  // NOTE: chrome.tabs.captureVisibleTab is rate-limited (~2 calls/sec). Firing
+  // faster gets calls rejected, dropping chunks and leaving black bands in the
+  // stitched image. So we pace captures ≥550ms apart and retry any that fail.
+  const capture = () => new Promise<string | null>((resolve) => {
+    chrome.runtime.sendMessage({ action: 'captureViewportChunk' }, (res) => {
+      resolve(res?.dataUrl ?? null);
+    });
+  });
+
+  // Sticky/fixed elements (e.g. headers) stay pinned to the viewport, so they'd
+  // be captured in EVERY chunk and repeat down the stitched image. Show them
+  // only in the first chunk (at their natural position); hide them afterwards.
+  const stickyEls: { el: HTMLElement; visibility: string }[] = [];
+  document.querySelectorAll<HTMLElement>('body *').forEach((el) => {
+    const pos = getComputedStyle(el).position;
+    if (pos === 'fixed' || pos === 'sticky') stickyEls.push({ el, visibility: el.style.visibility });
+  });
+
   while (currentScroll < totalHeight) {
     window.scrollTo(0, currentScroll);
-    await delay(250); // wait for render
+    const isFirstChunk = currentScroll === 0;
+    stickyEls.forEach(({ el, visibility }) => { el.style.visibility = isFirstChunk ? visibility : "hidden"; });
+    await delay(300); // let the new viewport paint
 
-    const response = await new Promise<any>((resolve) => {
-      chrome.runtime.sendMessage({ action: 'captureViewportChunk' }, (res) => {
-        resolve(res);
-      });
-    });
-
-    if (response && response.dataUrl) {
-      chunks.push({ dataUrl: response.dataUrl, y: currentScroll });
+    let dataUrl: string | null = null;
+    for (let attempt = 0; attempt < 4 && !dataUrl; attempt++) {
+      if (attempt > 0) await delay(600); // rate-limited on the prior try — back off
+      dataUrl = await capture();
     }
+    if (dataUrl) chunks.push({ dataUrl, y: currentScroll });
 
     currentScroll += viewportHeight;
+    await delay(250); // keep total spacing between captures above the quota
   }
 
-  // Restore scroll
+  // Restore sticky/fixed elements and scroll state.
+  stickyEls.forEach(({ el, visibility }) => { el.style.visibility = visibility; });
   document.body.style.overflow = originalOverflow;
   window.scrollTo(0, originalScrollTop);
 

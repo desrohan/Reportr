@@ -135,7 +135,13 @@ chrome.runtime.onMessage.addListener((request: any, _sender: any, sendResponse: 
     return false;
   } else if (request.action === 'captureViewportChunk') {
     chrome.tabs.captureVisibleTab(chrome.windows.WINDOW_ID_CURRENT, { format: 'png' }, (dataUrl) => {
-      sendResponse({ dataUrl });
+      // captureVisibleTab is rate-limited; on rejection it sets lastError and
+      // returns undefined. Report null so the content script retries this chunk.
+      if (chrome.runtime.lastError || !dataUrl) {
+        sendResponse({ dataUrl: null });
+      } else {
+        sendResponse({ dataUrl });
+      }
     });
     return true; // Async response
   } else if (request.action === 'fullPageCaptured') {

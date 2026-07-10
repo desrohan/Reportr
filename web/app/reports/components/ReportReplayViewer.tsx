@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { saveReport } from "../actions";
+import { ScreenshotAnnotator } from "./ScreenshotAnnotator";
 
 /* ═══════════════════  Types  ═══════════════════════════════════════════════ */
 
@@ -353,6 +354,50 @@ export function ReportReplayViewer({
     const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n;
   });
 
+  const generateVideoThumbnail = (videoEl: HTMLVideoElement, targetWidth = 320): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const width = videoEl.videoWidth || 640;
+      const height = videoEl.videoHeight || 360;
+      const scale = targetWidth / width;
+      canvas.width = targetWidth;
+      canvas.height = height * scale;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("Canvas context failed"));
+
+      try {
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))),
+          "image/jpeg",
+          0.7
+        );
+      } catch (err) {
+        reject(err);
+      }
+    });
+  };
+
+  const resolveVideoThumbnailUrl = async (): Promise<string | undefined> => {
+    if (!videoRef.current) return undefined;
+    try {
+      const blob = await generateVideoThumbnail(videoRef.current, 320);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: "thumbnail.jpg", contentType: "image/jpeg", workspaceId }),
+      });
+      if (!res.ok) throw new Error(`Upload API failed (${res.status})`);
+      const { uploadUrl, publicUrl } = await res.json();
+      await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob });
+      return publicUrl;
+    } catch (e) {
+      console.error("Failed to generate video thumbnail:", e);
+      return undefined;
+    }
+  };
+
   const handleSave = async () => {
     if (isUploading || !videoUrl) {
       alert("Video upload is still in progress. Please wait.");
@@ -364,10 +409,12 @@ export function ReportReplayViewer({
     }
     setIsSaving(true);
     try {
+      const thumbnailUrl = await resolveVideoThumbnailUrl();
       await saveReport({
         workspaceId,
         title,
         videoUrl,
+        thumbnailUrl,
         events,
       });
       router.push("/dashboard");
@@ -378,6 +425,19 @@ export function ReportReplayViewer({
       setIsSaving(false);
     }
   };
+
+  if (isImage) {
+    return (
+      <ScreenshotAnnotator
+        initialTitle={initialTitle}
+        videoUrl={videoUrl}
+        localVideoBase64={localVideoBase64}
+        workspaceId={workspaceId}
+        isDraft={isDraft}
+        isUploading={isUploading}
+      />
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh",

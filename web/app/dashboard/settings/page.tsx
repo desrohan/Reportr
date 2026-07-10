@@ -56,7 +56,7 @@ export default async function SettingsPage({
     .from('user_r2_settings')
     .select('r2_endpoint, r2_access_key_id, r2_secret_access_key, r2_bucket_name, r2_public_domain')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   const workspaceName = workspace?.name || 'Workspace'
 
