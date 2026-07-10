@@ -9,6 +9,9 @@ import {
 } from "../../../lib/annotations";
 import { flattenAnnotations } from "../../../lib/flattenAnnotations";
 import { saveReport } from "../actions";
+import {
+  uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, copyImageBlob,
+} from "../../../lib/reportMedia";
 
 interface ScreenshotAnnotatorProps {
   initialTitle: string;
@@ -331,15 +334,7 @@ export function ScreenshotAnnotator({
     if (!imgRef.current) return undefined;
     try {
       const blob = await generateScreenshotThumbnail(imgRef.current, annotations, 320);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: "thumbnail.jpg", contentType: "image/jpeg", workspaceId }),
-      });
-      if (!res.ok) throw new Error(`Upload API failed (${res.status})`);
-      const { uploadUrl, publicUrl } = await res.json();
-      await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob });
-      return publicUrl;
+      return await uploadToStorage(blob, "thumbnail.jpg", "image/jpeg", workspaceId);
     } catch (e) {
       console.error("Failed to generate thumbnail:", e);
       return undefined;
@@ -347,23 +342,26 @@ export function ScreenshotAnnotator({
   };
 
   const resolveImageUrl = async (): Promise<string> => {
-    if (annotations.length === 0 || !localVideoBase64 || !imgRef.current) return videoUrl;
-    const blob = await flattenAnnotations(imgRef.current, annotations);
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename: "annotated.png", contentType: "image/png", workspaceId }),
-    });
-    if (!res.ok) throw new Error(`Upload API failed (${res.status})`);
-    const { uploadUrl, publicUrl } = await res.json();
-    await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "image/png" }, body: blob });
-    return publicUrl;
+    // Annotated → flatten the drawing onto the image and upload the result.
+    if (annotations.length > 0 && localVideoBase64 && imgRef.current) {
+      const blob = await flattenAnnotations(imgRef.current, annotations);
+      return uploadToStorage(blob, "annotated.png", "image/png", workspaceId);
+    }
+    // No annotations but we still hold the local capture (deferred upload) →
+    // upload it as-is now that the user is saving.
+    if (localVideoBase64) {
+      const blob = await dataUrlToBlob(localVideoBase64);
+      return uploadToStorage(blob, "screenshot.png", "image/png", workspaceId);
+    }
+    // Already stored (e.g. re-saving an existing report).
+    return videoUrl;
   };
 
   const [isSaving, setIsSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
   const handleSave = async () => {
-    if (isUploading || !videoUrl) { alert("Upload is still in progress. Please wait."); return; }
     if (!workspaceId) { alert("Workspace context is missing. Record via the extension with a workspace selected."); return; }
+    if (!localVideoBase64 && !videoUrl) { alert("The screenshot is still processing. Please wait a moment."); return; }
     setIsSaving(true);
     try {
       const [finalUrl, thumbnailUrl] = await Promise.all([
@@ -380,19 +378,48 @@ export function ScreenshotAnnotator({
     }
   };
 
+  // Produce the current image as a Blob — the annotated composite when there are
+  // annotations, otherwise the raw local capture, otherwise the stored file
+  // fetched through the same-origin proxy (avoids cross-origin CORS/taint).
+  const resolveImageBlob = async (): Promise<Blob | null> => {
+    if (annotations.length > 0 && localVideoBase64 && imgRef.current) {
+      return flattenAnnotations(imgRef.current, annotations);
+    }
+    if (localVideoBase64) return dataUrlToBlob(localVideoBase64);
+    if (videoUrl) return (await fetch(proxyUrl(videoUrl))).blob();
+    return null;
+  };
+
   const handleDownload = async () => {
     try {
-      let href = videoUrl || localVideoBase64 || "";
-      if (annotations.length > 0 && localVideoBase64 && imgRef.current) {
-        const blob = await flattenAnnotations(imgRef.current, annotations);
-        href = URL.createObjectURL(blob);
+      // Draft (or annotated) → download the local/composited blob directly.
+      if (localVideoBase64) {
+        let href = localVideoBase64;
+        let isBlobUrl = false;
+        if (annotations.length > 0 && imgRef.current) {
+          href = URL.createObjectURL(await flattenAnnotations(imgRef.current, annotations));
+          isBlobUrl = true;
+        }
+        triggerDownload(href, "screenshot.png");
+        if (isBlobUrl) setTimeout(() => URL.revokeObjectURL(href), 1000);
+        return;
       }
-      const a = document.createElement("a");
-      a.href = href; a.download = "screenshot.png";
-      document.body.appendChild(a); a.click(); a.remove();
-      if (href.startsWith("blob:")) setTimeout(() => URL.revokeObjectURL(href), 1000);
+      // Saved (cross-origin R2) → force download via the proxy.
+      if (videoUrl) triggerDownload(proxyUrl(videoUrl, { download: "screenshot.png" }), "screenshot.png");
     } catch (err) {
       alert("Download failed: " + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      const blob = await resolveImageBlob();
+      if (!blob) return;
+      await copyImageBlob(blob);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      alert("Copy failed: " + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -412,7 +439,7 @@ export function ScreenshotAnnotator({
                            background: isUploading ? "#f3f4f6" : "#f0fdf4" }}>
               <span style={{ width: 7, height: 7, borderRadius: "50%",
                              background: isUploading ? "#9ca3af" : "#16a34a" }} />
-              {isUploading ? "Uploading…" : "Ready"}
+              {isUploading ? "Processing…" : "Ready"}
             </span>
           )}
           {isDraft ? (
@@ -436,6 +463,13 @@ export function ScreenshotAnnotator({
                        background: (isSaving || isUploading) ? "#9ca3af" : "#2563eb", color: "#fff",
                        border: "none", cursor: (isSaving || isUploading) ? "not-allowed" : "pointer" }}>
               {isSaving ? "Saving..." : "Save to Dashboard"}
+            </button>
+          )}
+          {src && (
+            <button onClick={handleCopy}
+              style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 6,
+                       border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}>
+              {copied ? "Copied!" : "⧉ Copy image"}
             </button>
           )}
           {src && (

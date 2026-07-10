@@ -217,16 +217,21 @@ export function DashboardClient({
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="mx-auto max-w-7xl p-8 space-y-6">
       {/* Title & View Toggle Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Recordings</h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-white tracking-tight">Recordings</h1>
+            <span className="rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-400">
+              {reports.length}{hasMore ? '+' : ''}
+            </span>
+          </div>
+          <p className="text-xs text-zinc-400 mt-1.5">
             Browse and search all workspace video recordings and annotated screenshots.
           </p>
         </div>
-        
+
         {/* Grid/List Toggle Switch */}
         <div className="flex items-center self-start sm:self-center bg-zinc-950 border border-zinc-800 rounded-xl p-1 shrink-0">
           <button 
@@ -267,7 +272,7 @@ export function DashboardClient({
                 placeholder="Search by title..."
                 value={searchVal}
                 onChange={e => setSearchVal(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition-colors"
               />
               <Search className="absolute left-3 top-2.5 text-zinc-600 h-3.5 w-3.5" />
             </div>
@@ -280,7 +285,7 @@ export function DashboardClient({
               <select
                 value={ownerFilter}
                 onChange={e => setOwnerFilter(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs appearance-none focus:outline-none focus:border-indigo-500 cursor-pointer transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs appearance-none focus:outline-none focus:border-blue-500 cursor-pointer transition-colors"
               >
                 <option value="all">Everyone</option>
                 <option value="me">Created by me</option>
@@ -300,7 +305,7 @@ export function DashboardClient({
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs focus:outline-none focus:border-blue-500 transition-colors"
               />
               <Calendar className="absolute left-3 top-2.5 text-zinc-600 h-3.5 w-3.5" />
             </div>
@@ -314,7 +319,7 @@ export function DashboardClient({
                 type="date"
                 value={endDate}
                 onChange={e => setEndDate(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs focus:outline-none focus:border-indigo-500 transition-colors"
+                className="w-full bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-xl px-3 py-2 pl-9 text-xs focus:outline-none focus:border-blue-500 transition-colors"
               />
               <Calendar className="absolute left-3 top-2.5 text-zinc-600 h-3.5 w-3.5" />
             </div>
@@ -327,7 +332,7 @@ export function DashboardClient({
           <div className="flex justify-end pt-1">
             <button
               onClick={handleClearFilters}
-              className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-semibold transition-colors cursor-pointer"
             >
               <RotateCcw size={12} />
               Reset Filters
@@ -355,7 +360,7 @@ export function DashboardClient({
         </div>
       ) : isFiltering ? (
         <div className="flex flex-col items-center justify-center py-32 text-center">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mb-4" />
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-4" />
           <p className="text-sm text-zinc-500">Filtering recordings...</p>
         </div>
       ) : viewMode === 'grid' ? (
@@ -416,7 +421,7 @@ export function DashboardClient({
                   
                   {/* Hover Indicator Icon */}
                   {!isImg && (
-                    <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-1.5 text-zinc-300 opacity-60 group-hover:opacity-100 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-md">
+                    <div className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg p-1.5 text-zinc-300 opacity-60 group-hover:opacity-100 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-md">
                       <Video size={13} />
                     </div>
                   )}
@@ -425,12 +430,12 @@ export function DashboardClient({
                   <div className="absolute top-3 left-3 bg-zinc-950/75 backdrop-blur-md border border-zinc-800 rounded-lg px-2 py-1 text-[10px] font-bold tracking-wide uppercase flex items-center gap-1.5 shadow-sm text-zinc-300">
                     {isImg ? (
                       <>
-                        <ImageIcon size={10} className="text-indigo-400" />
+                        <ImageIcon size={10} className="text-blue-400" />
                         Screenshot
                       </>
                     ) : (
                       <>
-                        <Play size={10} className="text-purple-400 fill-purple-400/20" />
+                        <Play size={10} className="text-blue-400 fill-blue-400/20" />
                         Video
                       </>
                     )}
@@ -454,7 +459,7 @@ export function DashboardClient({
                           className="w-6.5 h-6.5 rounded-full border border-zinc-800 shrink-0"
                         />
                       ) : (
-                        <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 border border-indigo-500/20 uppercase shadow-md shadow-indigo-600/10">
+                        <div className="w-6.5 h-6.5 rounded-full bg-gradient-to-tr from-blue-500 to-blue-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0 border border-blue-500/20 uppercase shadow-md shadow-blue-600/10">
                           {report.uploader?.name.charAt(0) || 'U'}
                         </div>
                       )}
@@ -537,7 +542,7 @@ export function DashboardClient({
                     )}
                     
                     {!isImg && (
-                      <div className="absolute bottom-1.5 right-1.5 bg-black/70 backdrop-blur-md rounded-md p-1 text-zinc-400 group-hover:text-white group-hover:bg-indigo-600 transition-all">
+                      <div className="absolute bottom-1.5 right-1.5 bg-black/70 backdrop-blur-md rounded-md p-1 text-zinc-400 group-hover:text-white group-hover:bg-blue-600 transition-all">
                         <Video size={10} />
                       </div>
                     )}
@@ -577,7 +582,7 @@ export function DashboardClient({
                         className="w-6 h-6 rounded-full border border-zinc-800"
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-[9px] font-bold text-white uppercase border border-indigo-500/20">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-500 to-blue-600 flex items-center justify-center text-[9px] font-bold text-white uppercase border border-blue-500/20">
                         {report.uploader?.name.charAt(0) || 'U'}
                       </div>
                     )}
@@ -604,7 +609,7 @@ export function DashboardClient({
         <div ref={observerTarget} className="flex justify-center py-8">
           {isLoading && (
             <div className="flex items-center gap-2 text-zinc-400 text-xs font-semibold">
-              <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
+              <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
               Loading more recordings...
             </div>
           )}

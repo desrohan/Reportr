@@ -77,8 +77,13 @@ export default async function TeamMembersPage({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-5">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">{workspaceName} Team</h1>
-            <p className="mt-1.5 text-sm text-zinc-400">Manage who has access to this workspace's bug reports.</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-white">{workspaceName} Team</h1>
+              <span className="rounded-full border border-zinc-800 bg-zinc-950 px-2.5 py-0.5 text-xs font-semibold text-zinc-400">
+                {members?.length || 0} {members?.length === 1 ? 'member' : 'members'}
+              </span>
+            </div>
+            <p className="mt-1.5 text-sm text-zinc-400">Manage who has access to this workspace&apos;s bug reports.</p>
           </div>
         </div>
 
@@ -118,7 +123,15 @@ export default async function TeamMembersPage({
                 {(members || []).map((m: Member) => (
                   <tr key={m.member_id} className="hover:bg-zinc-900/20 transition-colors text-sm">
                     <td className="px-6 py-4 font-medium text-zinc-200">
-                      {m.email} {m.user_id === user.id && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/15">You</span>}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-bold uppercase text-white shadow-sm shadow-blue-600/20">
+                          {m.email?.charAt(0) || 'U'}
+                        </div>
+                        <span className="truncate">{m.email}</span>
+                        {m.user_id === user.id && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/15">You</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider ${

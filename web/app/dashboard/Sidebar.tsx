@@ -1,17 +1,44 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { regenerateInviteCode } from './actions'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../utils/supabase/client'
+import { Logo } from '../components/Logo'
+import {
+  LayoutList,
+  Users,
+  Settings,
+  ChevronsUpDown,
+  Copy,
+  RefreshCw,
+  LogOut,
+  Check,
+} from 'lucide-react'
 
-export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { workspaces: any[], user: any }) {
+const NAV_ITEMS = [
+  { href: '/dashboard', label: 'All Recordings', icon: LayoutList, match: (p: string) => p === '/dashboard' || p === '/' },
+  { href: '/dashboard/members', label: 'Team Members', icon: Users, match: (p: string) => p === '/dashboard/members' },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings, match: (p: string) => p === '/dashboard/settings' },
+]
+
+export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { workspaces: any[]; user: any }) {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowProfileMenu(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -20,86 +47,83 @@ export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { work
   }
 
   const urlWorkspaceId = searchParams.get('workspace_id')
-  const activeWorkspaceId = urlWorkspaceId && workspaces.some(w => w.id === urlWorkspaceId)
-    ? urlWorkspaceId
-    : (workspaces[0]?.id || '')
+  const activeWorkspaceId =
+    urlWorkspaceId && workspaces.some((w) => w.id === urlWorkspaceId)
+      ? urlWorkspaceId
+      : workspaces[0]?.id || ''
 
-  const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0]
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0]
+  const inviteUrl =
+    typeof window !== 'undefined' && activeWorkspace?.invite_code
+      ? `${window.location.origin}/invite/${activeWorkspace.invite_code}`
+      : ''
+
+  const copyInvite = () => {
+    if (!inviteUrl) return
+    navigator.clipboard.writeText(inviteUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1600)
+  }
 
   return (
-    <aside className="w-64 flex flex-col justify-between py-6 px-4 bg-zinc-950">
-      <div>
-        <div className="flex items-center gap-2 mb-8 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 shadow-lg shadow-indigo-500/20">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
-          <span className="font-bold text-lg text-zinc-100 tracking-tight">Reportr</span>
+    <aside className="flex w-64 shrink-0 flex-col justify-between bg-zinc-950 px-4 py-6">
+      <div className="min-h-0">
+        <div className="px-2">
+          <Logo href="/dashboard" />
         </div>
 
-        {/* Workspace Switcher */}
-        <div className="mb-6">
-          <label className="px-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">Workspace</label>
-          <div className="mt-2 group relative">
+        {/* Workspace switcher */}
+        <div className="mt-8">
+          <label className="px-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">Workspace</label>
+          <div className="relative mt-2">
             <select
               title="workspace switcher"
-              className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-3 pr-8 text-sm font-medium text-zinc-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+              className="w-full cursor-pointer appearance-none rounded-xl border border-zinc-800 bg-zinc-900 py-2.5 pl-3 pr-9 text-sm font-medium text-zinc-100 transition-colors hover:border-zinc-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={activeWorkspaceId}
               onChange={(e) => {
-                const nextId = e.target.value
                 const params = new URLSearchParams(window.location.search)
-                params.set('workspace_id', nextId)
+                params.set('workspace_id', e.target.value)
                 router.push(`${pathname}?${params.toString()}`)
               }}
             >
-              {workspaces.map(w => (
-                <option key={w.id} value={w.id}>{w.name}</option>
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
               ))}
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-              </svg>
-            </div>
+            <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
           </div>
-          {activeWorkspace.invite_code && (
-            <div className="mt-3 px-3 py-2.5 rounded-xl bg-zinc-900/50 border border-zinc-800 flex flex-col gap-1.5">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500">Invite Members</span>
+
+          {activeWorkspace?.invite_code && (
+            <div className="mt-3 flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 py-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Invite link</span>
               <div className="flex items-center justify-between gap-2">
-                <input 
-                  readOnly 
-                  value={`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/invite/${activeWorkspace.invite_code}`}
-                  className="bg-transparent text-xs text-zinc-300 outline-none truncate w-full"
-                />
-                <div className="flex gap-2.5 shrink-0">
-                  <button 
-                    onClick={() => {
-                      const url = `${window.location.origin}/invite/${activeWorkspace.invite_code}`;
-                      navigator.clipboard.writeText(url);
-                      alert("Invite link copied to clipboard!");
-                    }}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 font-bold cursor-pointer transition-colors"
+                <input readOnly value={inviteUrl} className="w-full truncate bg-transparent text-xs text-zinc-300 outline-none" />
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <button
+                    onClick={copyInvite}
+                    className="text-zinc-400 transition-colors hover:text-blue-400"
+                    title="Copy invite link"
                   >
-                    Copy
+                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
                   </button>
                   {activeWorkspace.role === 'owner' && (
-                    <button 
+                    <button
                       onClick={async () => {
-                        if (confirm("Regenerate invite link? The old link will expire instantly.")) {
+                        if (confirm('Regenerate invite link? The old link will expire instantly.')) {
                           try {
-                            const newCode = await regenerateInviteCode(activeWorkspace.id);
-                            setWorkspaces(prev => prev.map(w => w.id === activeWorkspace.id ? { ...w, invite_code: newCode } : w));
-                            alert("New invite link generated!");
+                            const newCode = await regenerateInviteCode(activeWorkspace.id)
+                            setWorkspaces((prev) => prev.map((w) => (w.id === activeWorkspace.id ? { ...w, invite_code: newCode } : w)))
                           } catch (err: any) {
-                            alert(err.message || "Failed to regenerate");
+                            alert(err.message || 'Failed to regenerate')
                           }
                         }
                       }}
-                      className="text-xs text-zinc-500 hover:text-zinc-400 font-bold cursor-pointer transition-colors"
+                      className="text-zinc-500 transition-colors hover:text-zinc-300"
+                      title="Regenerate invite link"
                     >
-                      Regenerate
+                      <RefreshCw className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
@@ -108,80 +132,52 @@ export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { work
           )}
         </div>
 
-        <nav className="space-y-1">
-          <Link 
-            href={`/dashboard?workspace_id=${activeWorkspaceId}`}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              pathname === '/dashboard' || pathname === '/'
-                ? 'bg-zinc-900 text-white' 
-                : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
-            }`}
-          >
-            <svg className={`h-5 w-5 ${pathname === '/dashboard' || pathname === '/' ? 'text-indigo-400' : 'text-zinc-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-            </svg>
-            All Recordings
-          </Link>
-          <Link 
-            href={`/dashboard/members?workspace_id=${activeWorkspaceId}`}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              pathname === '/dashboard/members'
-                ? 'bg-zinc-900 text-white' 
-                : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
-            }`}
-          >
-            <svg className={`h-5 w-5 ${pathname === '/dashboard/members' ? 'text-indigo-400' : 'text-zinc-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-            Team Members
-          </Link>
-          <Link 
-            href={`/dashboard/settings?workspace_id=${activeWorkspaceId}`}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              pathname === '/dashboard/settings'
-                ? 'bg-zinc-900 text-white' 
-                : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
-            }`}
-          >
-            <svg className={`h-5 w-5 ${pathname === '/dashboard/settings' ? 'text-indigo-400' : 'text-zinc-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            Settings
-          </Link>
+        {/* Nav */}
+        <nav className="mt-7 space-y-1">
+          {NAV_ITEMS.map((item) => {
+            const active = item.match(pathname)
+            return (
+              <Link
+                key={item.href}
+                href={`${item.href}?workspace_id=${activeWorkspaceId}`}
+                className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active ? 'bg-zinc-900 text-white' : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-white'
+                }`}
+              >
+                {active && <span className="absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r-full bg-blue-500" />}
+                <item.icon className={`h-4.5 w-4.5 ${active ? 'text-blue-400' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                {item.label}
+              </Link>
+            )
+          })}
         </nav>
       </div>
 
-      <div className="relative border-t border-zinc-800 pt-4">
+      {/* Profile */}
+      <div ref={menuRef} className="relative border-t border-zinc-800 pt-4">
         {showProfileMenu && (
-          <div className="absolute bottom-full left-0 right-0 mb-2 py-1 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50">
+          <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 py-1 shadow-xl">
             <button
               onClick={handleLogout}
-              className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 hover:text-red-300 transition-colors flex items-center gap-2 cursor-pointer font-semibold"
+              className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left text-sm font-semibold text-rose-400 transition-colors hover:bg-zinc-800 hover:text-rose-300"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Log Out
+              <LogOut className="h-4 w-4" />
+              Log out
             </button>
           </div>
         )}
-        <button 
-          onClick={() => setShowProfileMenu(!showProfileMenu)}
-          className="w-full flex items-center gap-3 text-left px-2 py-1.5 rounded-xl hover:bg-zinc-900/60 transition-colors cursor-pointer focus:outline-none"
+        <button
+          onClick={() => setShowProfileMenu((v) => !v)}
+          className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-zinc-900/60 focus:outline-none"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-800 text-sm font-semibold text-white shrink-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-semibold text-white shadow-md shadow-blue-600/20">
             {user.user_metadata?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
           </div>
-          <div className="overflow-hidden flex-1">
+          <div className="flex-1 overflow-hidden">
             <p className="truncate text-sm font-semibold text-zinc-200">{user.user_metadata?.full_name || 'User'}</p>
             <p className="truncate text-xs text-zinc-500">{user.email}</p>
           </div>
-          <div className="text-zinc-500 pr-1 shrink-0">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h.01M12 12h.01M19 12h.01" />
-            </svg>
-          </div>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 text-zinc-500" />
         </button>
       </div>
     </aside>

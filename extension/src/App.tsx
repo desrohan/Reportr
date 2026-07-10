@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Camera, StopCircle, RefreshCw, MonitorPlay, Focus, Image as ImageIcon, AppWindow, ShieldAlert, Monitor } from 'lucide-react';
-import { DEFAULT_BACKEND_URL } from './config';
+import { Camera, StopCircle, RefreshCw, MonitorPlay, Focus, Image as ImageIcon, AppWindow, ShieldAlert, Monitor, LayoutGrid, LogOut } from 'lucide-react';
+import { getBackendUrl } from './config';
 import './App.css';
 import './index.css';
 
@@ -76,8 +76,27 @@ export default function App() {
     window.close();
   };
 
-  const openWebLogin = () => {
-    chrome.tabs.create({ url: DEFAULT_BACKEND_URL });
+  const openWebLogin = async () => {
+    // Use the origin the session was last synced from (e.g. localhost during
+    // dev), falling back to the packaged default for first-time users.
+    const base = await getBackendUrl();
+    chrome.tabs.create({ url: base });
+  };
+
+  const openDashboard = async () => {
+    const base = await getBackendUrl();
+    chrome.tabs.create({ url: `${base}/dashboard` });
+    window.close();
+  };
+
+  const handleSignOut = () => {
+    // Clear the synced session locally. The web dashboard keeps its own session;
+    // this just disconnects the extension until the user visits the dashboard
+    // again (which re-syncs via AuthSync).
+    chrome.storage.local.remove(['reportr_session'], () => {
+      setSession(null);
+      setSessionExpired(false);
+    });
   };
 
   if (isValidating) {
@@ -256,6 +275,31 @@ export default function App() {
         ) : (
           <p className="text-center text-xs text-zinc-400 py-2">Select an option above to capture screenshot</p>
         )}
+      </div>
+
+      {/* User bar */}
+      <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-100 bg-white">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-xs font-bold uppercase text-white">
+          {(session.user?.name || session.user?.email || 'U').charAt(0)}
+        </div>
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-sm font-semibold text-zinc-800">{session.user?.name || 'Signed in'}</p>
+          <p className="truncate text-[11px] text-zinc-400">{session.user?.email}</p>
+        </div>
+        <button
+          onClick={openDashboard}
+          title="My recordings"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-blue-600 transition-colors cursor-pointer"
+        >
+          <LayoutGrid size={16} />
+        </button>
+        <button
+          onClick={handleSignOut}
+          title="Sign out"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-red-50 hover:text-red-500 transition-colors cursor-pointer"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
 
     </div>

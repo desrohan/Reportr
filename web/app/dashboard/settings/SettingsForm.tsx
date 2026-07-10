@@ -108,7 +108,7 @@ export function SettingsForm({
         <details className="group" open>
           <summary className="text-lg font-bold text-white flex items-center justify-between gap-2 cursor-pointer list-none select-none">
             <span className="flex items-center gap-2">
-              <Database className="text-indigo-400 h-5 w-5 animate-pulse" />
+              <Database className="text-blue-400 h-5 w-5 animate-pulse" />
               Cloudflare R2 Setup Guide & Documentation
             </span>
             <span className="transition-transform group-open:rotate-180 text-zinc-400">
@@ -121,13 +121,13 @@ export function SettingsForm({
           <div className="mt-6 pt-6 border-t border-zinc-800 space-y-6 text-sm text-zinc-300">
             <div className="space-y-2">
               <h3 className="font-bold text-zinc-200">1. Sign Up / Log In to Cloudflare</h3>
-              <p>Go to <a href="https://cloudflare.com" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 underline font-semibold">cloudflare.com</a>, create a free account, or log in if you already have one.</p>
+              <p>Go to <a href="https://cloudflare.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-semibold">cloudflare.com</a>, create a free account, or log in if you already have one.</p>
             </div>
 
             <div className="space-y-2">
               <h3 className="font-bold text-zinc-200">2. Locate your Account ID and R2 Endpoint</h3>
               <p>Navigate to <strong>R2 Object Storage</strong> in the Cloudflare sidebar. Look on the right-hand side of the page for your <strong>Account ID</strong>. Use this ID to construct your Endpoint: </p>
-              <code className="block bg-zinc-900 border border-zinc-800 p-2.5 rounded-lg font-mono text-xs text-indigo-300 select-all">
+              <code className="block bg-zinc-900 border border-zinc-800 p-2.5 rounded-lg font-mono text-xs text-blue-300 select-all">
                 https://&lt;ACCOUNT_ID&gt;.r2.cloudflarestorage.com
               </code>
             </div>
@@ -169,7 +169,7 @@ export function SettingsForm({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-zinc-800 pb-6 mb-8">
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Cloud className="text-indigo-400 h-5 w-5" />
+              <Cloud className="text-blue-400 h-5 w-5" />
               Workspace R2 Storage
             </h2>
             <p className="text-sm text-zinc-400 max-w-2xl">
@@ -195,7 +195,7 @@ export function SettingsForm({
                   disabled={!isOwner || savingWorkspace}
                   value={workspaceEndpoint}
                   onChange={(e) => setWorkspaceEndpoint(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Database className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -210,7 +210,7 @@ export function SettingsForm({
                   disabled={!isOwner || savingWorkspace}
                   value={workspaceBucket}
                   onChange={(e) => setWorkspaceBucket(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Cloud className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -225,7 +225,7 @@ export function SettingsForm({
                   disabled={!isOwner || savingWorkspace}
                   value={workspaceAccessKey}
                   onChange={(e) => setWorkspaceAccessKey(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Key className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -240,7 +240,7 @@ export function SettingsForm({
                   disabled={!isOwner || savingWorkspace}
                   value={workspaceSecretKey}
                   onChange={(e) => setWorkspaceSecretKey(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Lock className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
                 {isOwner && (
@@ -264,7 +264,7 @@ export function SettingsForm({
                   disabled={!isOwner || savingWorkspace}
                   value={workspaceDomain}
                   onChange={(e) => setWorkspaceDomain(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Globe className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -290,7 +290,7 @@ export function SettingsForm({
               <button
                 type="submit"
                 disabled={savingWorkspace}
-                className="rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+                className="rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
               >
                 {savingWorkspace && <Loader2 className="animate-spin h-4 w-4" />}
                 Save Workspace Storage
@@ -305,7 +305,7 @@ export function SettingsForm({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 border-b border-zinc-800 pb-6 mb-8">
           <div className="space-y-1">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Cloud className="text-purple-400 h-5 w-5" />
+              <Cloud className="text-blue-400 h-5 w-5" />
               Personal R2 Storage (Override)
             </h2>
             <p className="text-sm text-zinc-400 max-w-2xl">
@@ -325,7 +325,7 @@ export function SettingsForm({
                   disabled={savingPersonal}
                   value={personalEndpoint}
                   onChange={(e) => setPersonalEndpoint(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Database className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -340,7 +340,7 @@ export function SettingsForm({
                   disabled={savingPersonal}
                   value={personalBucket}
                   onChange={(e) => setPersonalBucket(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Cloud className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -355,7 +355,7 @@ export function SettingsForm({
                   disabled={savingPersonal}
                   value={personalAccessKey}
                   onChange={(e) => setPersonalAccessKey(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Key className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -370,7 +370,7 @@ export function SettingsForm({
                   disabled={savingPersonal}
                   value={personalSecretKey}
                   onChange={(e) => setPersonalSecretKey(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 pr-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Lock className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
                 <button
@@ -392,7 +392,7 @@ export function SettingsForm({
                   disabled={savingPersonal}
                   value={personalDomain}
                   onChange={(e) => setPersonalDomain(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 pl-10 text-sm text-zinc-100 placeholder-zinc-600 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
                 />
                 <Globe className="absolute left-3.5 top-3.5 text-zinc-600 h-4 w-4" />
               </div>
@@ -422,7 +422,7 @@ export function SettingsForm({
             <button
               type="submit"
               disabled={savingPersonal}
-              className="rounded-xl bg-purple-600 hover:bg-purple-500 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+              className="rounded-xl bg-blue-600 hover:bg-blue-600 active:scale-[0.98] transition-all px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
             >
               {savingPersonal && <Loader2 className="animate-spin h-4 w-4" />}
               Save Personal Storage

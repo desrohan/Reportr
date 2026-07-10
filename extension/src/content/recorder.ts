@@ -461,13 +461,24 @@ async function runFullPageCapture(workspaceId: string | null) {
     stickyEls.forEach(({ el, visibility }) => { el.style.visibility = isFirstChunk ? visibility : "hidden"; });
     await delay(300); // let the new viewport paint
 
+    // The browser clamps scrolling near the bottom (you can't scroll a full
+    // viewport past the end), so the LAST chunk actually shows content from a
+    // smaller offset than we requested. Stitch by the *real* scroll position,
+    // not the requested one — otherwise the tail gets drawn too low and the
+    // final section duplicates. The overlap with the previous chunk is identical
+    // content, so overwriting it is harmless.
+    const actualY = Math.round(window.scrollY || document.documentElement.scrollTop);
+
     let dataUrl: string | null = null;
     for (let attempt = 0; attempt < 4 && !dataUrl; attempt++) {
       if (attempt > 0) await delay(600); // rate-limited on the prior try — back off
       dataUrl = await capture();
     }
-    if (dataUrl) chunks.push({ dataUrl, y: currentScroll });
+    if (dataUrl) chunks.push({ dataUrl, y: actualY });
 
+    // Stop once we've reached the bottom (a clamped scroll means the next step
+    // would re-capture the same final chunk).
+    if (actualY + viewportHeight >= totalHeight) break;
     currentScroll += viewportHeight;
     await delay(250); // keep total spacing between captures above the quota
   }

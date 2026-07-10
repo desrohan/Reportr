@@ -145,7 +145,7 @@ chrome.runtime.onMessage.addListener((request: any, _sender: any, sendResponse: 
     });
     return true; // Async response
   } else if (request.action === 'fullPageCaptured') {
-    createAndUploadScreenshot(request.dataUrl, request.workspaceId);
+    createScreenshotDraft(request.dataUrl, request.workspaceId);
     return false;
   }
   return false;
@@ -324,11 +324,15 @@ async function handleLocalVideoReady(draftKey: string, base64: string) {
   console.log('[Reportr][bg] video received from offscreen', { draftKey, length: base64?.length });
   const result = await chrome.storage.local.get([draftKey]);
   const draft = (result[draftKey] || {}) as any;
-  // Store the base64 for instant local playback on the review page...
-  await chrome.storage.local.set({ [draftKey]: { ...draft, localVideoBase64: base64 } });
-  // ...then upload to R2 here in the service worker (offscreen docs can't use
-  // chrome.storage / getBackendUrl, so the upload must happen in the background).
-  uploadVideo(base64, draftKey, draft.workspaceId ?? null);
+  // Hand the local recording to the review page and mark it ready. We do NOT
+  // upload to R2 here anymore — the draft stays local until the user clicks
+  // "Save to Dashboard", at which point the web app uploads it. This keeps
+  // throwaway recordings out of storage and means capture works even when the
+  // extension's synced session has expired (the dashboard handles auth on save).
+  await chrome.storage.local.set({
+    [draftKey]: { ...draft, localVideoBase64: base64, status: 'ready' },
+  });
+  try { await chrome.offscreen.closeDocument(); } catch (_) {}
 }
 
 // Returns a currently-valid Supabase access token, refreshing it via the web
@@ -382,50 +386,6 @@ async function getValidAccessToken(): Promise<string | null> {
   }
 }
 
-async function uploadVideo(base64Data: string, draftKey: string, workspaceId: string | null) {
-  try {
-    const resBlob = await fetch(base64Data);
-    const blob = await resBlob.blob();
-
-    const backendUrl = await getBackendUrl();
-    const accessToken = await getValidAccessToken();
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-
-    console.log('[Reportr][bg] requesting upload URL', { draftKey, backendUrl, workspaceId, hasToken: !!accessToken });
-    const uploadRes = await fetch(`${backendUrl}/api/upload`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        filename: 'recording.webm',
-        contentType: 'video/webm',
-        workspaceId
-      })
-    });
-    if (uploadRes.status === 401) { await markDraftAuthError(draftKey); return; }
-    if (!uploadRes.ok) throw new Error(`Upload API failed (${uploadRes.status})`);
-    const { uploadUrl, publicUrl } = await uploadRes.json();
-
-    await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'video/webm' },
-      body: blob
-    });
-
-    console.log('[Reportr][bg] video uploaded', { draftKey, publicUrl });
-    const result = await chrome.storage.local.get([draftKey]);
-    const draft = result[draftKey] || {};
-    await chrome.storage.local.set({ [draftKey]: { ...draft, status: 'ready', videoUrl: publicUrl } });
-    try { await chrome.offscreen.closeDocument(); } catch (_) {}
-  } catch (err: any) {
-    console.error('[Reportr][bg] video upload failed:', err);
-    markDraftError(draftKey, err.message);
-  }
-}
-
 async function finishReportCreation(draftKey: string, videoUrl: string) {
   const result = await chrome.storage.local.get([draftKey]);
   const draft = result[draftKey] || {};
@@ -440,24 +400,6 @@ async function markDraftError(draftKey: string, error: string) {
   try { await chrome.offscreen.closeDocument(); } catch (_) {}
 }
 
-// The recording succeeded but the user's session is no longer valid, so the
-// upload was rejected. Flag it distinctly so the review page can offer sign-in
-// (and, once signed in, we could retry) instead of a generic failure.
-async function markDraftAuthError(draftKey: string) {
-  console.warn('[Reportr][bg] upload rejected (401) — session invalid, sign-in required');
-  const result = await chrome.storage.local.get([draftKey]);
-  const draft = result[draftKey] || {};
-  await chrome.storage.local.set({
-    [draftKey]: {
-      ...draft,
-      status: 'error',
-      authRequired: true,
-      error: 'Your session has expired. Please sign in again to finish uploading.'
-    }
-  });
-  try { await chrome.offscreen.closeDocument(); } catch (_) {}
-}
-
 // --- Screenshot Captures Core Orchestrator ---
 
 async function handleScreenshotCapture(type: 'visible' | 'full' | 'selected', workspaceId: string | null) {
@@ -468,7 +410,7 @@ async function handleScreenshotCapture(type: 'visible' | 'full' | 'selected', wo
   if (type === 'visible') {
     chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' }, (dataUrl) => {
       if (dataUrl) {
-        createAndUploadScreenshot(dataUrl, workspaceId);
+        createScreenshotDraft(dataUrl, workspaceId);
       }
     });
   } else if (type === 'selected') {
@@ -498,20 +440,22 @@ async function handleSelectionCompleted(box: { x: number, y: number, w: number, 
     // Call content script to crop via canvas
     chrome.tabs.sendMessage(tab.id!, { action: 'cropImage', dataUrl, box }, (response: any) => {
       if (response && response.croppedDataUrl) {
-        createAndUploadScreenshot(response.croppedDataUrl, workspaceId);
+        createScreenshotDraft(response.croppedDataUrl, workspaceId);
       }
     });
   });
 }
 
-async function createAndUploadScreenshot(dataUrl: string, workspaceId: string | null) {
+async function createScreenshotDraft(dataUrl: string, workspaceId: string | null) {
   const reportDataId = Date.now().toString();
   const draftKey = `report_draft_${reportDataId}`;
 
-  // Store draft shell and load immediately in tab
+  // The screenshot bytes are already in hand, so the draft is immediately ready
+  // for local preview/annotation. Upload to R2 is deferred to "Save to
+  // Dashboard" in the web app — nothing is stored until the user keeps it.
   await chrome.storage.local.set({
     [draftKey]: {
-      status: 'uploading',
+      status: 'ready',
       events: [],
       recordingStartedAt: Date.now(),
       workspaceId: workspaceId,
@@ -522,52 +466,4 @@ async function createAndUploadScreenshot(dataUrl: string, workspaceId: string | 
   const encodedId = encodeURIComponent(draftKey);
   const backendUrl = await getBackendUrl();
   chrome.tabs.create({ url: `${backendUrl}/reports/new?draftId=${encodedId}` });
-
-  // Upload screenshot file in background
-  uploadScreenshot(dataUrl, draftKey, workspaceId);
-}
-
-async function uploadScreenshot(base64Data: string, draftKey: string, workspaceId: string | null) {
-  try {
-    const resBlob = await fetch(base64Data);
-    const blob = await resBlob.blob();
-
-    const backendUrl = await getBackendUrl();
-    const accessToken = await getValidAccessToken();
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (accessToken) {
-      headers['Authorization'] = `Bearer ${accessToken}`;
-    }
-
-    const uploadRes = await fetch(`${backendUrl}/api/upload`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        filename: 'screenshot.png',
-        contentType: 'image/png',
-        workspaceId
-      })
-    });
-
-    if (uploadRes.status === 401) { await markDraftAuthError(draftKey); return; }
-    if (!uploadRes.ok) throw new Error('Upload API failed');
-    const { uploadUrl, publicUrl } = await uploadRes.json();
-
-    await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'image/png' },
-      body: blob
-    });
-
-    // Mark as ready
-    const result = await chrome.storage.local.get([draftKey]);
-    const draft = result[draftKey] || {};
-    await chrome.storage.local.set({ [draftKey]: { ...draft, status: 'ready', videoUrl: publicUrl } });
-  } catch (err: any) {
-    console.error('[Reportr] Screenshot upload failed:', err);
-    const result = await chrome.storage.local.get([draftKey]);
-    const draft = result[draftKey] || {};
-    await chrome.storage.local.set({ [draftKey]: { ...draft, status: 'error', error: err.message } });
-  }
 }

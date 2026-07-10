@@ -40,7 +40,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 shadow-2xl backdrop-blur-xl">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-xl shadow-indigo-500/20">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-xl shadow-blue-500/20">
             <span className="text-2xl font-bold text-white tracking-widest">{workspace.name.substring(0, 2).toUpperCase()}</span>
           </div>
           <h2 className="text-2xl font-bold text-white">You've been invited</h2>

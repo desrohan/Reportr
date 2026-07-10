@@ -13,7 +13,9 @@ html, body {
 
 #root {
   width: 360px;
-  height: 520px;
+  /* Grow to fit content (Chrome sizes the popup to the body), with a floor so
+     short states still feel substantial. Avoids clipping the footer. */
+  min-height: 520px;
   margin: 0;
   padding: 0;
   box-sizing: border-box;

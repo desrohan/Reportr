@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { saveReport } from "../actions";
 import { ScreenshotAnnotator } from "./ScreenshotAnnotator";
+import { uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload } from "../../../lib/reportMedia";
 
 /* ═══════════════════  Types  ═══════════════════════════════════════════════ */
 
@@ -109,7 +110,7 @@ function StatusBadge({ uploading }: { uploading: boolean }) {
                    background: uploading ? "#f3f4f6" : "#f0fdf4" }}>
       <span style={{ width: 7, height: 7, borderRadius: "50%", display: "inline-block",
                      background: uploading ? "#9ca3af" : "#16a34a" }} />
-      {uploading ? "Uploading…" : "Ready"}
+      {uploading ? "Processing…" : "Ready"}
     </span>
   );
 }
@@ -279,6 +280,7 @@ export function ReportReplayViewer({
   const [categories, setCategories] = useState<Set<ConsoleCat>>(new Set(["nav", "netError", "activity", "console"]));
   const [expandedNet, setExpandedNet] = useState<Set<number>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const isImage = useMemo(() => {
@@ -383,15 +385,7 @@ export function ReportReplayViewer({
     if (!videoRef.current) return undefined;
     try {
       const blob = await generateVideoThumbnail(videoRef.current, 320);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: "thumbnail.jpg", contentType: "image/jpeg", workspaceId }),
-      });
-      if (!res.ok) throw new Error(`Upload API failed (${res.status})`);
-      const { uploadUrl, publicUrl } = await res.json();
-      await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: blob });
-      return publicUrl;
+      return await uploadToStorage(blob, "thumbnail.jpg", "image/jpeg", workspaceId);
     } catch (e) {
       console.error("Failed to generate video thumbnail:", e);
       return undefined;
@@ -399,21 +393,32 @@ export function ReportReplayViewer({
   };
 
   const handleSave = async () => {
-    if (isUploading || !videoUrl) {
-      alert("Video upload is still in progress. Please wait.");
+    if (isUploading) {
+      alert("The recording is still processing. Please wait a moment.");
       return;
     }
     if (!workspaceId) {
       alert("Workspace context is missing. Make sure you recorded using the extension with a selected workspace.");
       return;
     }
+    if (!videoUrl && !localVideoBase64) {
+      alert("No recording to save.");
+      return;
+    }
     setIsSaving(true);
     try {
+      // Upload the local recording to storage now. Drafts are kept local until
+      // this moment, so saving is what actually puts the file in R2.
+      let finalUrl = videoUrl;
+      if (!finalUrl && localVideoBase64) {
+        const blob = await dataUrlToBlob(localVideoBase64);
+        finalUrl = await uploadToStorage(blob, "recording.webm", "video/webm", workspaceId);
+      }
       const thumbnailUrl = await resolveVideoThumbnailUrl();
       await saveReport({
         workspaceId,
         title,
-        videoUrl,
+        videoUrl: finalUrl,
         thumbnailUrl,
         events,
       });
@@ -423,6 +428,29 @@ export function ReportReplayViewer({
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (localVideoBase64) {
+      triggerDownload(localVideoBase64, "recording.webm");
+    } else if (videoUrl) {
+      // Cross-origin R2 ignores the download attribute, so route through the
+      // same-origin proxy which sets Content-Disposition: attachment.
+      triggerDownload(proxyUrl(videoUrl, { download: "recording.webm" }), "recording.webm");
+    }
+  };
+
+  // A recorded video can't be placed on the clipboard (browsers have no video
+  // clipboard type), so "copy" copies the direct file link instead.
+  const handleCopyLink = async () => {
+    if (!videoUrl) return;
+    try {
+      await navigator.clipboard.writeText(videoUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      /* clipboard blocked */
     }
   };
 
@@ -508,12 +536,20 @@ export function ReportReplayViewer({
             </button>
           )}
           {videoUrl && (
-            <a href={videoUrl} download="recording.webm"
+            <button onClick={handleCopyLink}
                style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 6,
-                        border: "1px solid #d1d5db", background: "#fff", textDecoration: "none",
+                        border: "1px solid #d1d5db", background: "#fff", cursor: "pointer",
+                        color: "#374151" }}>
+              {copiedLink ? "Link copied!" : "⧉ Copy link"}
+            </button>
+          )}
+          {(videoUrl || localVideoBase64) && (
+            <button onClick={handleDownload}
+               style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 6,
+                        border: "1px solid #d1d5db", background: "#fff", cursor: "pointer",
                         color: "#374151", display: "flex", alignItems: "center" }}>
               ↓ Download
-            </a>
+            </button>
           )}
         </div>
       </header>
