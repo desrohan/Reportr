@@ -1,7 +1,18 @@
+// Origins we trust to hand us a session. Without this gate, ANY page the user
+// visits could postMessage a forged REPORTR_AUTH_SYNC and inject a session into
+// the extension. Only the real Reportr dashboard (prod + local dev) is allowed.
+const ALLOWED_ORIGINS = new Set([
+  'https://reportr.tools.rohan-shah.in',
+  'http://localhost:3000',
+]);
+
 // Listens for postMessage events from the Reportr web dashboard
 window.addEventListener('message', (event) => {
-  // Only accept messages from the same origin to be safe
+  // Must originate from this same window/frame AND from a trusted dashboard
+  // origin. event.source guards against cross-frame injection; event.origin
+  // guards against a malicious page spoofing the sync message.
   if (event.source !== window) return;
+  if (!ALLOWED_ORIGINS.has(event.origin)) return;
 
   if (event.data && event.data.type === 'REPORTR_AUTH_SYNC') {
     const session = event.data.session;

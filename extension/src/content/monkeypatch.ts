@@ -1,5 +1,40 @@
 // Runs in MAIN world to overwrite window globals before the page loads.
 (function () {
+  // Restrict relay messages to the current document's origin instead of '*' so
+  // captured traffic isn't broadcast to cross-origin frames or other listeners.
+  // Opaque-origin documents (sandboxed iframes, data: URLs) report 'null', which
+  // can't be used as a postMessage targetOrigin — fall back to '*' there; the
+  // ISOLATED-world receiver still gates on event.source === window.
+  const pageOrigin =
+    window.location.origin && window.location.origin !== 'null'
+      ? window.location.origin
+      : '*';
+
+  // Headers that commonly carry credentials or session tokens. We strip their
+  // values before a captured request ever leaves the page, so auth secrets don't
+  // end up in stored bug reports or exposed to same-page scripts.
+  const SENSITIVE_HEADERS = new Set([
+    'authorization',
+    'proxy-authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-key',
+    'x-auth-token',
+    'x-access-token',
+    'x-session-token',
+    'x-csrf-token',
+    'x-xsrf-token',
+    'api-key',
+  ]);
+
+  function redactHeaders(headers: Record<string, string>): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const key in headers) {
+      out[key] = SENSITIVE_HEADERS.has(key.toLowerCase()) ? '[redacted]' : headers[key];
+    }
+    return out;
+  }
+
   // ─── Fetch ────────────────────────────────────────────────────────
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
@@ -45,11 +80,11 @@
           status: response.status,
           duration: Date.now() - startTime,
           size, contentType,
-          requestHeaders, requestBody,
-          responseHeaders,
+          requestHeaders: redactHeaders(requestHeaders), requestBody,
+          responseHeaders: redactHeaders(responseHeaders),
           responseBody: body.substring(0, 5000),
         }
-      }, '*');
+      }, pageOrigin);
       return response;
     } catch (err) {
       window.postMessage({
@@ -58,9 +93,9 @@
           type: 'fetch', url, method,
           error: String(err),
           duration: Date.now() - startTime,
-          requestHeaders, requestBody,
+          requestHeaders: redactHeaders(requestHeaders), requestBody,
         }
-      }, '*');
+      }, pageOrigin);
       throw err;
     }
   };
@@ -119,12 +154,12 @@
           status: this.status,
           duration: Date.now() - r.startTime,
           size, contentType,
-          requestHeaders: r.reqHeaders,
+          requestHeaders: redactHeaders(r.reqHeaders),
           requestBody: r.reqBody,
-          responseHeaders,
+          responseHeaders: redactHeaders(responseHeaders),
           responseBody,
         }
-      }, '*');
+      }, pageOrigin);
     });
 
     return originalSend.apply(this, arguments as any);
@@ -141,7 +176,7 @@
           level: method,
           message: args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
         }
-      }, '*');
+      }, pageOrigin);
       original.apply(console, args);
     };
   });
@@ -160,6 +195,6 @@
         className: target.className?.toString().slice(0, 80) ?? '',
         x: e.clientX, y: e.clientY,
       }
-    }, '*');
+    }, pageOrigin);
   }, true);
 })();

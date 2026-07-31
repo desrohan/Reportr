@@ -10,8 +10,9 @@ import {
 import { flattenAnnotations } from "../../../lib/flattenAnnotations";
 import { saveReport } from "../actions";
 import {
-  uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, copyImageBlob,
+  uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, copyImageBlob, formatSpeed,
 } from "../../../lib/reportMedia";
+import type { UploadProgress } from "../../../lib/reportMedia";
 
 interface ScreenshotAnnotatorProps {
   initialTitle: string;
@@ -341,17 +342,17 @@ export function ScreenshotAnnotator({
     }
   };
 
-  const resolveImageUrl = async (): Promise<string> => {
+  const resolveImageUrl = async (onProgress?: (p: UploadProgress) => void): Promise<string> => {
     // Annotated → flatten the drawing onto the image and upload the result.
     if (annotations.length > 0 && localVideoBase64 && imgRef.current) {
       const blob = await flattenAnnotations(imgRef.current, annotations);
-      return uploadToStorage(blob, "annotated.png", "image/png", workspaceId);
+      return uploadToStorage(blob, "annotated.png", "image/png", workspaceId, onProgress);
     }
     // No annotations but we still hold the local capture (deferred upload) →
     // upload it as-is now that the user is saving.
     if (localVideoBase64) {
       const blob = await dataUrlToBlob(localVideoBase64);
-      return uploadToStorage(blob, "screenshot.png", "image/png", workspaceId);
+      return uploadToStorage(blob, "screenshot.png", "image/png", workspaceId, onProgress);
     }
     // Already stored (e.g. re-saving an existing report).
     return videoUrl;
@@ -359,15 +360,23 @@ export function ScreenshotAnnotator({
 
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Image-upload progress. `null` while saving means the (small) thumbnail +
+  // DB write are wrapping up; a number is the main image's upload percentage.
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [uploadBps, setUploadBps] = useState(0);
   const handleSave = async () => {
     if (!workspaceId) { alert("Workspace context is missing. Record via the extension with a workspace selected."); return; }
     if (!localVideoBase64 && !videoUrl) { alert("The screenshot is still processing. Please wait a moment."); return; }
     setIsSaving(true);
     try {
+      // Track the main image (the big one — full-page captures can be large);
+      // the thumbnail uploads alongside it but is tiny.
+      setUploadPct(0);
       const [finalUrl, thumbnailUrl] = await Promise.all([
-        resolveImageUrl(),
+        resolveImageUrl((p) => { setUploadPct(p.percent); setUploadBps(p.bytesPerSecond); }),
         resolveThumbnailUrl()
       ]);
+      setUploadPct(null);
       await saveReport({ workspaceId, title, videoUrl: finalUrl, thumbnailUrl, events: [] });
       router.push("/dashboard");
     } catch (err) {
@@ -375,6 +384,8 @@ export function ScreenshotAnnotator({
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
+      setUploadPct(null);
+      setUploadBps(0);
     }
   };
 
@@ -459,10 +470,22 @@ export function ScreenshotAnnotator({
           </button>
           {isDraft && (
             <button onClick={handleSave} disabled={isSaving || isUploading}
-              style={{ fontSize: 12, fontWeight: 600, padding: "5px 14px", borderRadius: 6,
-                       background: (isSaving || isUploading) ? "#9ca3af" : "#2563eb", color: "#fff",
+              style={{ position: "relative", overflow: "hidden", fontSize: 12, fontWeight: 600,
+                       padding: "5px 14px", borderRadius: 6, minWidth: isSaving ? 200 : undefined,
+                       background: isSaving ? "#1e3a8a" : (isUploading ? "#9ca3af" : "#2563eb"), color: "#fff",
                        border: "none", cursor: (isSaving || isUploading) ? "not-allowed" : "pointer" }}>
-              {isSaving ? "Saving..." : "Save to Dashboard"}
+              {isSaving && (
+                <span aria-hidden style={{ position: "absolute", left: 0, top: 0, bottom: 0,
+                         width: uploadPct === null ? "100%" : `${uploadPct}%`,
+                         background: "#2563eb", transition: "width 0.2s ease" }} />
+              )}
+              <span style={{ position: "relative", zIndex: 1, whiteSpace: "nowrap" }}>
+                {!isSaving
+                  ? "Save to Dashboard"
+                  : uploadPct !== null
+                    ? `Uploading ${uploadPct}%${formatSpeed(uploadBps) ? " · " + formatSpeed(uploadBps) : ""}`
+                    : "Finishing…"}
+              </span>
             </button>
           )}
           {src && (

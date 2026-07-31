@@ -316,6 +316,7 @@ export default async function LandingPage() {
             <div className="flex items-center gap-7 text-sm text-zinc-400">
               <a href="#features" className="transition-colors hover:text-white">Features</a>
               <a href="#install" className="transition-colors hover:text-white">How it works</a>
+              <Link href="/privacy" className="transition-colors hover:text-white">Privacy</Link>
               <Link href={primaryHref} className="transition-colors hover:text-white">
                 {user ? 'Dashboard' : 'Sign in'}
               </Link>

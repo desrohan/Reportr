@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { saveWorkspaceR2Settings, savePersonalR2Settings } from './actions'
 import { Cloud, Key, Lock, Database, Globe, Eye, EyeOff, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 
@@ -48,6 +48,12 @@ export function SettingsForm({
 
   const [workspaceFeedback, setWorkspaceFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [personalFeedback, setPersonalFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  // Origin to show in the CORS example (the address the browser uploads from).
+  // Starts as the production URL so server and first client render match, then
+  // resolves to the real origin after mount (covers localhost / self-hosting).
+  const [appOrigin, setAppOrigin] = useState('https://reportr.tools.rohan-shah.in')
+  useEffect(() => { setAppOrigin(window.location.origin) }, [])
 
   const handleWorkspaceSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,6 +165,22 @@ export function SettingsForm({
                 <li>Copy <strong>Access Key ID</strong> and insert it into the <strong>Access Key ID</strong> field.</li>
                 <li>Copy <strong>Secret Access Key</strong> and insert it into the <strong>Secret Access Key</strong> field.</li>
               </ul>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="font-bold text-zinc-200">6. Add a CORS Policy (Required for Uploads)</h3>
+              <p>Recordings and screenshots upload straight from your browser to R2, so the bucket must allow cross-origin <strong>PUT</strong> requests from Reportr. Without this, saving a report will fail.</p>
+              <p>Open your bucket&apos;s <strong>Settings</strong> tab, find the <strong>CORS Policy</strong> section, click <strong>Edit</strong>, and paste:</p>
+              <code className="block whitespace-pre bg-zinc-900 border border-zinc-800 p-3 rounded-lg font-mono text-xs text-blue-300 overflow-x-auto select-all">{`[
+  {
+    "AllowedOrigins": ["${appOrigin}"],
+    "AllowedMethods": ["GET", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]`}</code>
+              <p className="text-[11px] text-zinc-500 mt-1"><code className="bg-zinc-900 border border-zinc-800 px-1 py-0.5 rounded text-zinc-300 font-mono">AllowedOrigins</code> is the address where you use Reportr (shown above for this deployment). It saves within about a minute.</p>
             </div>
           </div>
         </details>

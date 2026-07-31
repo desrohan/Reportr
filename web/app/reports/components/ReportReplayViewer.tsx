@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { saveReport } from "../actions";
 import { ScreenshotAnnotator } from "./ScreenshotAnnotator";
-import { uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload } from "../../../lib/reportMedia";
+import { uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, formatSpeed } from "../../../lib/reportMedia";
 
 /* ═══════════════════  Types  ═══════════════════════════════════════════════ */
 
@@ -282,6 +282,11 @@ export function ReportReplayViewer({
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // Video-upload progress. `null` while saving means we're past the upload and
+  // into the quick finishing steps (thumbnail + DB write); a number is the
+  // upload percentage. `uploadBps` drives the live speed readout.
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
+  const [uploadBps, setUploadBps] = useState(0);
 
   const isImage = useMemo(() => {
     const url = localVideoBase64 || videoUrl || '';
@@ -412,8 +417,15 @@ export function ReportReplayViewer({
       let finalUrl = videoUrl;
       if (!finalUrl && localVideoBase64) {
         const blob = await dataUrlToBlob(localVideoBase64);
-        finalUrl = await uploadToStorage(blob, "recording.webm", "video/webm", workspaceId);
+        setUploadPct(0);
+        finalUrl = await uploadToStorage(blob, "recording.webm", "video/webm", workspaceId, (p) => {
+          setUploadPct(p.percent);
+          setUploadBps(p.bytesPerSecond);
+        });
       }
+      // Video's done; the thumbnail + DB write are quick, so drop into the
+      // indeterminate "Finishing…" state rather than tracking their bytes.
+      setUploadPct(null);
       const thumbnailUrl = await resolveVideoThumbnailUrl();
       await saveReport({
         workspaceId,
@@ -428,6 +440,8 @@ export function ReportReplayViewer({
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsSaving(false);
+      setUploadPct(null);
+      setUploadBps(0);
     }
   };
 
@@ -511,17 +525,43 @@ export function ReportReplayViewer({
               onClick={handleSave}
               disabled={isSaving || isUploading}
               style={{
+                position: "relative",
+                overflow: "hidden",
                 fontSize: 12,
                 fontWeight: 600,
                 padding: "5px 14px",
                 borderRadius: 6,
-                background: (isSaving || isUploading) ? "#9ca3af" : "#2563eb",
+                minWidth: isSaving ? 200 : undefined,
+                // While saving the button is a progress track (dark blue) that
+                // the fill sweeps across; otherwise it's the normal solid blue.
+                background: isSaving ? "#1e3a8a" : (isUploading ? "#9ca3af" : "#2563eb"),
                 color: "#fff",
                 border: "none",
                 cursor: (isSaving || isUploading) ? "not-allowed" : "pointer"
               }}
             >
-              {isSaving ? "Saving..." : "Save to Dashboard"}
+              {isSaving && (
+                <span
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    // Grows with the upload; full bar during the finishing steps.
+                    width: uploadPct === null ? "100%" : `${uploadPct}%`,
+                    background: "#2563eb",
+                    transition: "width 0.2s ease",
+                  }}
+                />
+              )}
+              <span style={{ position: "relative", zIndex: 1, whiteSpace: "nowrap" }}>
+                {!isSaving
+                  ? "Save to Dashboard"
+                  : uploadPct !== null
+                    ? `Uploading ${uploadPct}%${formatSpeed(uploadBps) ? " · " + formatSpeed(uploadBps) : ""}`
+                    : "Finishing…"}
+              </span>
             </button>
           )}
 

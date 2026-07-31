@@ -26,7 +26,7 @@ export function AuthSync({ session, workspaces }: { session: Session | null, wor
             workspaces: workspaces || []
           }
         : null
-    }, '*')
+    }, window.location.origin)
   }, [session, workspaces])
 
   return null
