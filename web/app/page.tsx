@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import {
   Camera,
   ScrollText,
@@ -100,7 +101,19 @@ const STEPS = [
   },
 ]
 
-export default async function LandingPage() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>
+}) {
+  // If an OAuth code lands on the site root (Supabase Site URL fallback when
+  // redirect_to doesn't match the allow list), forward it to the callback
+  // route so the session still gets established instead of dead-ending here.
+  const { code } = await searchParams
+  if (code) {
+    redirect(`/auth/callback?code=${code}&next=/dashboard`)
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
