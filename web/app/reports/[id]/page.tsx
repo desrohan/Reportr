@@ -1,9 +1,27 @@
 import { createClient } from "../../../utils/supabase/server";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ReportReplayViewer } from "../components/ReportReplayViewer";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+}
+
+// Browser tab + link previews show the recording title (with "| Reportr"
+// appended by the root layout's title template).
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const supabase = await createClient();
+  const { data: report } = await supabase
+    .from("reports")
+    .select("title")
+    .eq("id", id)
+    .maybeSingle();
+
+  return {
+    title: report?.title || "Shared Recording",
+    description: "Watch the recording and inspect the captured network, console, and session replay.",
+  };
 }
 
 export default async function ReportPage({ params }: PageProps) {
