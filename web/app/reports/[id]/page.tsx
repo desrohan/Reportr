@@ -18,9 +18,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     .eq("id", id)
     .maybeSingle();
 
+  const title = report?.title || "Shared Recording";
+  const description =
+    "Watch the recording and inspect the captured network, console, and session replay.";
+
+  // Set openGraph/twitter explicitly: the root layout defines its own
+  // openGraph.title, which otherwise wins over this page's plain `title`.
   return {
-    title: report?.title || "Shared Recording",
-    description: "Watch the recording and inspect the captured network, console, and session replay.",
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { title, description },
   };
 }
 
