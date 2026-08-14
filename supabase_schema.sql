@@ -28,6 +28,7 @@ create table public.reports (
   video_url text,
   title text,
   status text default 'new',
+  is_public boolean not null default true, -- anyone with the link can view
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -95,5 +96,14 @@ create policy "Members can view report events" on public.report_events
 create policy "Members can insert report events" on public.report_events
   for insert with check (
     report_id in (select id from public.reports where workspace_id in (select workspace_id from public.workspace_members where user_id = auth.uid()))
+  );
+
+-- Public sharing: anyone with the report link (signed in or not) can view the
+-- report and its events. Write policies stay member-only.
+create policy "Public reports are viewable by anyone" on public.reports
+  for select using (is_public);
+create policy "Public report events are viewable by anyone" on public.report_events
+  for select using (
+    report_id in (select id from public.reports where is_public)
   );
 

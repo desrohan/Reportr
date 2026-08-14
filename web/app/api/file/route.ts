@@ -50,14 +50,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Only https urls are allowed' }, { status: 400 })
   }
 
-  // Must be signed in — this proxies workspace media.
+  // Signed-in users may proxy media stored on their personal/workspace custom
+  // domains in addition to the wildcard R2 hosts. Anonymous visitors (public
+  // shared-report links) may proxy only the env/wildcard hosts — the R2 bucket
+  // is public anyway; this route exists to force downloads and clipboard reads.
   const supabase = await createServerClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
 
   // Build the set of allowed hosts from configured public domains (in addition
   // to the Cloudflare wildcard hosts handled above).
@@ -65,22 +65,24 @@ export async function GET(req: Request) {
   const envHost = hostnameOf(process.env.R2_PUBLIC_DOMAIN)
   if (envHost) allowed.add(envHost)
 
-  const { data: personal } = await supabase
-    .from('user_r2_settings')
-    .select('r2_public_domain')
-    .eq('user_id', user.id)
-    .maybeSingle()
-  const personalHost = hostnameOf(personal?.r2_public_domain)
-  if (personalHost) allowed.add(personalHost)
+  if (user) {
+    const { data: personal } = await supabase
+      .from('user_r2_settings')
+      .select('r2_public_domain')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    const personalHost = hostnameOf(personal?.r2_public_domain)
+    if (personalHost) allowed.add(personalHost)
 
-  const { data: memberships } = await supabase
-    .from('workspace_members')
-    .select('workspaces(r2_public_domain)')
-    .eq('user_id', user.id)
-  for (const m of memberships || []) {
-    const ws = (m as any).workspaces
-    const h = hostnameOf(ws?.r2_public_domain)
-    if (h) allowed.add(h)
+    const { data: memberships } = await supabase
+      .from('workspace_members')
+      .select('workspaces(r2_public_domain)')
+      .eq('user_id', user.id)
+    for (const m of memberships || []) {
+      const ws = (m as any).workspaces
+      const h = hostnameOf(ws?.r2_public_domain)
+      if (h) allowed.add(h)
+    }
   }
 
   if (!hostAllowed(parsed.hostname, allowed)) {
