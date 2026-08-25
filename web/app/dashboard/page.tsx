@@ -1,5 +1,5 @@
 import { createClient } from '../../utils/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createClient as createAdminClient, type User } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { DashboardClient } from './DashboardClient'
 import { fetchPaginatedReports } from './actions'
@@ -52,7 +52,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     .select('user_id')
     .eq('workspace_id', activeWorkspaceId)
 
-  const memberIds = new Set((members || []).map((m: any) => m.user_id))
+  const memberIds = new Set((members || []).map((m: { user_id: string }) => m.user_id))
 
   // Fetch user profiles using service role client to retrieve email, full_name, and avatar_url
   const adminSupabase = createAdminClient(
@@ -71,8 +71,8 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   // Filter users to only show members of this workspace
   const workspaceMembers = authUsers
-    .filter((u: any) => memberIds.has(u.id))
-    .map((u: any) => ({
+    .filter((u: User) => memberIds.has(u.id))
+    .map((u: User) => ({
       id: u.id,
       name: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Anonymous',
       avatarUrl: u.user_metadata?.avatar_url || null,

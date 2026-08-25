@@ -3,6 +3,7 @@
 import { createClient } from '../../utils/supabase/server'
 import { randomBytes } from 'crypto'
 import { revalidatePath } from 'next/cache'
+import type { User } from '@supabase/supabase-js'
 
 export async function regenerateInviteCode(workspaceId: string) {
   const supabase = await createClient()
@@ -125,7 +126,7 @@ export async function fetchPaginatedReports(params: {
   const authUsers = usersData?.users || []
 
   const usersMap = new Map()
-  authUsers.forEach((u: any) => {
+  authUsers.forEach((u: User) => {
     usersMap.set(u.id, {
       id: u.id,
       name: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Anonymous',
@@ -135,7 +136,7 @@ export async function fetchPaginatedReports(params: {
   })
 
   // Map uploader details to each report
-  const reportsWithUploader = (reports || []).map((r: any) => ({
+  const reportsWithUploader = (reports || []).map((r) => ({
     ...r,
     uploader: usersMap.get(r.created_by) || {
       id: r.created_by,

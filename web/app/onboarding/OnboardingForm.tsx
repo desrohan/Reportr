@@ -20,8 +20,8 @@ export function OnboardingForm({ defaultOrgName, initialInviteCode }: Onboarding
     setLoading(true)
     try {
       await joinWorkspaceAction(inviteCode)
-    } catch (err: any) {
-      setError(err.message || 'Failed to join workspace')
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : 'Failed to join workspace')
       setLoading(false)
     }
   }

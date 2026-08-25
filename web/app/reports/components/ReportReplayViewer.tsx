@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { saveReport } from "../actions";
+import { saveReport, updateReportTitle } from "../actions";
 import { ScreenshotAnnotator } from "./ScreenshotAnnotator";
 import { uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, formatSpeed } from "../../../lib/reportMedia";
 
@@ -20,7 +20,7 @@ interface ClickPayload { tagName: string; text: string; outerHTML: string; }
 type Plugin = "network" | "console" | "click";
 interface RawEvent {
   type: number;
-  data: { plugin?: Plugin; payload?: any; href?: string };
+  data: { plugin?: Plugin; payload?: unknown; href?: string };
   timestamp: number;
 }
 
@@ -257,6 +257,8 @@ interface ReportReplayViewerProps {
   workspaceId?: string;
   isDraft?: boolean;
   isUploading?: boolean;
+  reportId?: string;
+  isOwner?: boolean;
 }
 
 export function ReportReplayViewer({
@@ -267,11 +269,19 @@ export function ReportReplayViewer({
   workspaceId,
   isDraft = false,
   isUploading = false,
+  reportId,
+  isOwner = false,
 }: ReportReplayViewerProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const [title, setTitle] = useState(initialTitle);
+  // After a successful save from draft mode we stay on this page: the header
+  // switches to the saved-report buttons and the URL becomes /reports/{id}
+  // (via history.replaceState, so the server component is not re-fetched).
+  const [savedReportId, setSavedReportId] = useState<string | null>(reportId ?? null);
+  const [justSaved, setJustSaved] = useState(false);
+  const [lastSavedTitle, setLastSavedTitle] = useState(initialTitle);
   const [currentTime, setCurrentTime] = useState(0);
   const [tab, setTab] = useState<"console" | "network">("console");
   const [filter, setFilter] = useState("");
@@ -354,11 +364,17 @@ export function ReportReplayViewer({
   }, [start]);
 
   const toggleCat = (c: ConsoleCat) => setCategories(prev => {
-    const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n;
+    const n = new Set(prev);
+    if (n.has(c)) n.delete(c);
+    else n.add(c);
+    return n;
   });
-  
+
   const toggleNetRow = (idx: number) => setExpandedNet(prev => {
-    const n = new Set(prev); n.has(idx) ? n.delete(idx) : n.add(idx); return n;
+    const n = new Set(prev);
+    if (n.has(idx)) n.delete(idx);
+    else n.add(idx);
+    return n;
   });
 
   const generateVideoThumbnail = (videoEl: HTMLVideoElement, targetWidth = 320): Promise<Blob> => {
@@ -427,14 +443,19 @@ export function ReportReplayViewer({
       // indeterminate "Finishing…" state rather than tracking their bytes.
       setUploadPct(null);
       const thumbnailUrl = await resolveVideoThumbnailUrl();
-      await saveReport({
+      const newReportId = await saveReport({
         workspaceId,
         title,
         videoUrl: finalUrl,
         thumbnailUrl,
         events,
       });
-      router.push("/dashboard");
+      // Stay on the report: switch the header to the saved-report buttons and
+      // point the URL at the saved report so Share/Copy produce the right link.
+      setSavedReportId(newReportId);
+      setJustSaved(true);
+      setLastSavedTitle(title);
+      window.history.replaceState(null, "", `/reports/${newReportId}`);
     } catch (err) {
       console.error("Save error:", err);
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
@@ -442,6 +463,30 @@ export function ReportReplayViewer({
       setIsSaving(false);
       setUploadPct(null);
       setUploadBps(0);
+    }
+  };
+
+  // Draft mode ends once the report is saved from this page; after that the
+  // header shows the same buttons as a report opened from the dashboard.
+  const draftMode = isDraft && !justSaved;
+  // The creator can rename — either the owner of an existing report, or the
+  // user who just saved this draft.
+  const canRename = !draftMode && (isOwner || justSaved);
+
+  const handleRename = async () => {
+    if (!savedReportId) return;
+    const next = title.trim() || "Untitled Recording";
+    if (next === lastSavedTitle) {
+      setTitle(lastSavedTitle);
+      return;
+    }
+    setTitle(next);
+    try {
+      await updateReportTitle(savedReportId, next);
+      setLastSavedTitle(next);
+    } catch (err) {
+      alert("Failed to rename report: " + (err instanceof Error ? err.message : String(err)));
+      setTitle(lastSavedTitle);
     }
   };
 
@@ -477,6 +522,8 @@ export function ReportReplayViewer({
         workspaceId={workspaceId}
         isDraft={isDraft}
         isUploading={isUploading}
+        reportId={reportId}
+        isOwner={isOwner}
       />
     );
   }
@@ -490,8 +537,8 @@ export function ReportReplayViewer({
                        alignItems: "center", justifyContent: "space-between", padding: "0 20px", flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3, cursor: "pointer" }} onClick={() => router.push("/dashboard")}>Reportr</span>
-          {isDraft && <StatusBadge uploading={isUploading} />}
-          {isDraft ? (
+          {draftMode && <StatusBadge uploading={isUploading} />}
+          {draftMode ? (
             <input
               value={title}
               onChange={e => setTitle(e.target.value)}
@@ -507,6 +554,31 @@ export function ReportReplayViewer({
               }}
               placeholder="Enter report title..."
             />
+          ) : canRename ? (
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={e => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") {
+                  setTitle(lastSavedTitle);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              title="Click to rename"
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                outline: "none",
+                padding: "4px 8px",
+                minWidth: 240,
+                background: "#fafafa"
+              }}
+            />
           ) : (
             <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", borderLeft: "1px solid #e5e7eb", paddingLeft: 12 }}>{title}</span>
           )}
@@ -517,10 +589,10 @@ export function ReportReplayViewer({
             style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 6,
                      border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}
           >
-            {isDraft ? "Cancel" : "Back to Dashboard"}
+            {draftMode ? "Cancel" : "Back to Dashboard"}
           </button>
           
-          {isDraft && (
+          {draftMode && (
             <button
               onClick={handleSave}
               disabled={isSaving || isUploading}
@@ -565,7 +637,7 @@ export function ReportReplayViewer({
             </button>
           )}
 
-          {!isDraft && (
+          {!draftMode && (
             <button onClick={() => {
               const url = window.location.href.split('#')[0] + `#t=${Math.floor(currentTime)}`;
               navigator.clipboard.writeText(url);

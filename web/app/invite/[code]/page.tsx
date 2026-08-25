@@ -43,7 +43,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-xl shadow-blue-500/20">
             <span className="text-2xl font-bold text-white tracking-widest">{workspace.name.substring(0, 2).toUpperCase()}</span>
           </div>
-          <h2 className="text-2xl font-bold text-white">You've been invited</h2>
+          <h2 className="text-2xl font-bold text-white">You&apos;ve been invited</h2>
           <p className="mt-2 text-zinc-400">
             Join <strong className="text-white">{workspace.name}</strong> on Reportr
           </p>

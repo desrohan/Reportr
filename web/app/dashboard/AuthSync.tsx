@@ -3,7 +3,14 @@
 import { useEffect } from 'react'
 import { Session } from '@supabase/supabase-js'
 
-export function AuthSync({ session, workspaces }: { session: Session | null, workspaces?: any[] }) {
+export interface AuthSyncWorkspace {
+  id: string
+  name?: string
+  role?: string
+  invite_code?: string
+}
+
+export function AuthSync({ session, workspaces }: { session: Session | null, workspaces?: AuthSyncWorkspace[] }) {
   useEffect(() => {
     if (typeof window === 'undefined') return
 

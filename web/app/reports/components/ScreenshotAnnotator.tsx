@@ -8,7 +8,7 @@ import {
   annotationBBox, translateAnnotation, resizeAnnotation, hitTest,
 } from "../../../lib/annotations";
 import { flattenAnnotations } from "../../../lib/flattenAnnotations";
-import { saveReport } from "../actions";
+import { saveReport, updateReportTitle } from "../actions";
 import {
   uploadToStorage, dataUrlToBlob, proxyUrl, triggerDownload, copyImageBlob, formatSpeed,
 } from "../../../lib/reportMedia";
@@ -21,6 +21,8 @@ interface ScreenshotAnnotatorProps {
   workspaceId?: string;
   isDraft?: boolean;
   isUploading?: boolean;
+  reportId?: string;
+  isOwner?: boolean;
 }
 
 const btn = (active: boolean) => ({
@@ -35,6 +37,7 @@ const divider = { width: 1, height: 20, background: "#565c6a", margin: "0 8px" }
 
 export function ScreenshotAnnotator({
   initialTitle, videoUrl, localVideoBase64, workspaceId, isDraft = false, isUploading = false,
+  reportId, isOwner = false,
 }: ScreenshotAnnotatorProps) {
   const router = useRouter();
   const imgRef = useRef<HTMLImageElement>(null);
@@ -42,6 +45,11 @@ export function ScreenshotAnnotator({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [title, setTitle] = useState(initialTitle);
+  // After saving we stay on the page: the header switches to the saved-report
+  // buttons and the URL becomes /reports/{id} (via history.replaceState).
+  const [savedReportId, setSavedReportId] = useState<string | null>(reportId ?? null);
+  const [justSaved, setJustSaved] = useState(false);
+  const [lastSavedTitle, setLastSavedTitle] = useState(initialTitle);
   const [tool, setTool] = useState<Tool>("arrow");
   const [color, setColor] = useState(SWATCHES[0]);
   const [fontSize, setFontSize] = useState(28); // default size for new text
@@ -70,7 +78,12 @@ export function ScreenshotAnnotator({
   const STROKE = 4;
 
   const src = localVideoBase64 || videoUrl;
-  const editable = isDraft && imgLoaded;
+  // Draft mode ends once the report is saved from this page.
+  const draftMode = isDraft && !justSaved;
+  // The creator can rename — either the owner of an existing report, or the
+  // user who just saved this draft.
+  const canRename = !draftMode && (isOwner || justSaved);
+  const editable = draftMode && imgLoaded;
 
   const selected = tool === "select" && selectedId ? annotations.find((a) => a.id === selectedId) : undefined;
   const selectedText = selected && selected.kind === "text" ? selected : undefined;
@@ -305,7 +318,7 @@ export function ScreenshotAnnotator({
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-    const scaledAnnotations = annotations.map(a => {
+    const scaledAnnotations = annotations.map((a): Annotation => {
       if (a.kind === "pen") {
         return { ...a, points: a.points.map(p => ({ x: p.x * scale, y: p.y * scale })), width: Math.max(1, a.width * scale) };
       }
@@ -319,7 +332,7 @@ export function ScreenshotAnnotator({
         return { ...a, x: a.x * scale, y: a.y * scale, fontSize: Math.max(8, a.fontSize * scale) };
       }
       return a;
-    }) as any[];
+    });
 
     const { drawAnnotation } = await import("../../../lib/annotations");
     for (const a of scaledAnnotations) {
@@ -377,8 +390,13 @@ export function ScreenshotAnnotator({
         resolveThumbnailUrl()
       ]);
       setUploadPct(null);
-      await saveReport({ workspaceId, title, videoUrl: finalUrl, thumbnailUrl, events: [] });
-      router.push("/dashboard");
+      const newReportId = await saveReport({ workspaceId, title, videoUrl: finalUrl, thumbnailUrl, events: [] });
+      // Stay on the report: switch the header to the saved-report buttons and
+      // point the URL at the saved report.
+      setSavedReportId(newReportId);
+      setJustSaved(true);
+      setLastSavedTitle(title);
+      window.history.replaceState(null, "", `/reports/${newReportId}`);
     } catch (err) {
       console.error("Save error:", err);
       alert("Failed to save report: " + (err instanceof Error ? err.message : String(err)));
@@ -386,6 +404,23 @@ export function ScreenshotAnnotator({
       setIsSaving(false);
       setUploadPct(null);
       setUploadBps(0);
+    }
+  };
+
+  const handleRename = async () => {
+    if (!savedReportId) return;
+    const next = title.trim() || "Untitled Recording";
+    if (next === lastSavedTitle) {
+      setTitle(lastSavedTitle);
+      return;
+    }
+    setTitle(next);
+    try {
+      await updateReportTitle(savedReportId, next);
+      setLastSavedTitle(next);
+    } catch (err) {
+      alert("Failed to rename report: " + (err instanceof Error ? err.message : String(err)));
+      setTitle(lastSavedTitle);
     }
   };
 
@@ -443,7 +478,7 @@ export function ScreenshotAnnotator({
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 700, cursor: "pointer" }}
                 onClick={() => router.push("/dashboard")}>Reportr</span>
-          {isDraft && (
+          {draftMode && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12,
                            fontWeight: 500, padding: "2px 10px", borderRadius: 20,
                            color: isUploading ? "#6b7280" : "#16a34a",
@@ -453,9 +488,22 @@ export function ScreenshotAnnotator({
               {isUploading ? "Processing…" : "Ready"}
             </span>
           )}
-          {isDraft ? (
+          {draftMode ? (
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter report title..."
               style={{ fontSize: 13, fontWeight: 500, border: "1px solid #e5e7eb", borderRadius: 6,
+                       outline: "none", padding: "4px 8px", minWidth: 240, background: "#fafafa" }} />
+          ) : canRename ? (
+            <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={handleRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") {
+                  setTitle(lastSavedTitle);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              title="Click to rename"
+              style={{ fontSize: 13, fontWeight: 600, color: "#374151",
+                       border: "1px solid #e5e7eb", borderRadius: 6,
                        outline: "none", padding: "4px 8px", minWidth: 240, background: "#fafafa" }} />
           ) : (
             <span style={{ fontSize: 13, fontWeight: 600, color: "#374151",
@@ -466,9 +514,9 @@ export function ScreenshotAnnotator({
           <button onClick={() => router.push("/dashboard")}
             style={{ fontSize: 12, fontWeight: 500, padding: "5px 12px", borderRadius: 6,
                      border: "1px solid #d1d5db", background: "#fff", cursor: "pointer", color: "#374151" }}>
-            {isDraft ? "Cancel" : "Back to Dashboard"}
+            {draftMode ? "Cancel" : "Back to Dashboard"}
           </button>
-          {isDraft && (
+          {draftMode && (
             <button onClick={handleSave} disabled={isSaving || isUploading}
               style={{ position: "relative", overflow: "hidden", fontSize: 12, fontWeight: 600,
                        padding: "5px 14px", borderRadius: 6, minWidth: isSaving ? 200 : undefined,
@@ -506,7 +554,7 @@ export function ScreenshotAnnotator({
       </header>
 
       {/* Toolbar */}
-      {isDraft && (
+      {draftMode && (
         <div style={{ height: 46, background: "#3a3f4b", display: "flex", alignItems: "center",
                       gap: 6, padding: "0 16px", flexShrink: 0, opacity: editable ? 1 : 0.5,
                       pointerEvents: editable ? "auto" : "none" }}>

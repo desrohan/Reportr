@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../utils/supabase/client'
 import { Logo } from '../components/Logo'
+import type { User } from '@supabase/supabase-js'
 import {
   LayoutList,
   Users,
@@ -17,13 +18,20 @@ import {
   Check,
 } from 'lucide-react'
 
+interface SidebarWorkspace {
+  id: string
+  name: string
+  role: string
+  invite_code: string
+}
+
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'All Recordings', icon: LayoutList, match: (p: string) => p === '/dashboard' || p === '/' },
   { href: '/dashboard/members', label: 'Team Members', icon: Users, match: (p: string) => p === '/dashboard/members' },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings, match: (p: string) => p === '/dashboard/settings' },
 ]
 
-export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { workspaces: any[]; user: any }) {
+export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { workspaces: SidebarWorkspace[]; user: User }) {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -115,8 +123,8 @@ export function DashboardSidebar({ workspaces: initialWorkspaces, user }: { work
                           try {
                             const newCode = await regenerateInviteCode(activeWorkspace.id)
                             setWorkspaces((prev) => prev.map((w) => (w.id === activeWorkspace.id ? { ...w, invite_code: newCode } : w)))
-                          } catch (err: any) {
-                            alert(err.message || 'Failed to regenerate')
+                          } catch (err: unknown) {
+                            alert(err instanceof Error && err.message ? err.message : 'Failed to regenerate')
                           }
                         }
                       }}

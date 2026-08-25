@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   LayoutGrid, 
   List as ListIcon, 
@@ -12,9 +12,13 @@ import {
   Image as ImageIcon,
   RotateCcw,
   Video,
-  Loader2
+  Loader2,
+  MoreVertical,
+  Pencil,
+  Trash2
 } from 'lucide-react'
 import { fetchPaginatedReports } from './actions'
+import { updateReportTitle, deleteReport } from '../reports/actions'
 
 // 1. Configurable Thumbnail Resolution (CSS/HTML sizing limit)
 const THUMBNAIL_WIDTH = 384; 
@@ -76,8 +80,108 @@ export function DashboardClient({
   // Hover playback state (only loads video on hover, saving bandwidth)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
 
+  // Per-report actions (owner-only): 3-dots menu, inline rename, delete
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameVal, setRenameVal] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
   // Intersection observer target
   const observerTarget = useRef<HTMLDivElement>(null)
+
+  // Close the 3-dots menu when clicking anywhere else
+  useEffect(() => {
+    if (!menuOpenId) return
+    const close = () => setMenuOpenId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [menuOpenId])
+
+  const startRename = (report: Report) => {
+    setRenamingId(report.id)
+    setRenameVal(report.title || '')
+    setMenuOpenId(null)
+  }
+
+  const submitRename = async (report: Report) => {
+    // Enter submits and unmounts the input, which fires onBlur — ignore that
+    // second invocation so the rename request isn't sent twice.
+    if (renamingId !== report.id) return
+    setRenamingId(null)
+    const next = renameVal.trim()
+    if (!next || next === (report.title || '')) return
+    try {
+      await updateReportTitle(report.id, next)
+      setReports(prev => prev.map(r => r.id === report.id ? { ...r, title: next } : r))
+    } catch (err) {
+      alert('Failed to rename report: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  const handleDelete = async (report: Report) => {
+    setMenuOpenId(null)
+    if (!window.confirm(`Delete "${report.title || 'Untitled Recording'}"? This cannot be undone.`)) return
+    setDeletingId(report.id)
+    try {
+      await deleteReport(report.id)
+      setReports(prev => prev.filter(r => r.id !== report.id))
+    } catch (err) {
+      alert('Failed to delete report: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // 3-dots menu shown only on reports the current user created. Rendered inside
+  // the report <a> tags, so every interaction must stop the anchor navigation.
+  const renderReportMenu = (report: Report) => (
+    <div
+      className="relative shrink-0"
+      onClick={e => { e.preventDefault(); e.stopPropagation() }}
+    >
+      <button
+        onClick={() => setMenuOpenId(menuOpenId === report.id ? null : report.id)}
+        className="rounded-lg p-1.5 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors cursor-pointer"
+        title="Report actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {menuOpenId === report.id && (
+        <div className="absolute right-0 top-full mt-1 w-32 rounded-xl border border-zinc-800 bg-zinc-950 shadow-xl shadow-black/50 z-30 overflow-hidden py-1">
+          <button
+            onClick={() => startRename(report)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer"
+          >
+            <Pencil size={12} />
+            Rename
+          </button>
+          <button
+            onClick={() => handleDelete(report)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:bg-zinc-900 hover:text-red-300 transition-colors cursor-pointer"
+          >
+            <Trash2 size={12} />
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  // Inline title editor used while renaming from the 3-dots menu.
+  const renderRenameInput = (report: Report, className: string) => (
+    <input
+      autoFocus
+      value={renameVal}
+      onChange={e => setRenameVal(e.target.value)}
+      onClick={e => { e.preventDefault(); e.stopPropagation() }}
+      onBlur={() => submitRename(report)}
+      onKeyDown={e => {
+        if (e.key === 'Enter') submitRename(report)
+        if (e.key === 'Escape') setRenamingId(null)
+      }}
+      className={className}
+    />
+  )
 
   // Format Date & Time: "27 July, 2026 09:00 PM"
   const formatDateTime = (dateStr: string) => {
@@ -98,7 +202,7 @@ export function DashboardClient({
       hours = hours ? hours : 12
       
       return `${day} ${month}, ${year} ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`
-    } catch (_) {
+    } catch {
       return dateStr
     }
   }
@@ -370,12 +474,13 @@ export function DashboardClient({
           {reports.map((report) => {
             const isImg = isImageReport(report.video_url)
             const isHovered = hoveredId === report.id
+            const isOwner = report.created_by === currentUserId
 
             return (
               <a 
                 key={report.id} 
                 href={`/reports/${report.id}`} 
-                className="group flex flex-col overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 transition-all hover:border-zinc-700 hover:shadow-2xl hover:shadow-black/70"
+                className={`group flex flex-col overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950 transition-all hover:border-zinc-700 hover:shadow-2xl hover:shadow-black/70 ${deletingId === report.id ? 'opacity-50 pointer-events-none' : ''}`}
                 onMouseEnter={() => setHoveredId(report.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
@@ -444,9 +549,16 @@ export function DashboardClient({
 
                 {/* Metadata & Creator info */}
                 <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                  <h3 className="font-semibold text-sm text-zinc-100 line-clamp-1 group-hover:text-white transition-colors">
-                    {report.title || 'Untitled Recording'}
-                  </h3>
+                  <div className="flex items-start justify-between gap-2">
+                    {renamingId === report.id ? (
+                      renderRenameInput(report, 'w-full bg-zinc-900 border border-zinc-700 text-zinc-100 rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:border-blue-500')
+                    ) : (
+                      <h3 className="font-semibold text-sm text-zinc-100 line-clamp-1 group-hover:text-white transition-colors">
+                        {report.title || 'Untitled Recording'}
+                      </h3>
+                    )}
+                    {isOwner && renamingId !== report.id && renderReportMenu(report)}
+                  </div>
                   
                   {/* Footer creator block */}
                   <div className="flex items-center justify-between border-t border-zinc-900 pt-3.5">
@@ -489,12 +601,13 @@ export function DashboardClient({
           {reports.map((report) => {
             const isImg = isImageReport(report.video_url)
             const isHovered = hoveredId === report.id
+            const isOwner = report.created_by === currentUserId
 
             return (
               <a 
                 key={report.id} 
                 href={`/reports/${report.id}`} 
-                className="group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 transition-colors hover:bg-zinc-900/30"
+                className={`group flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 gap-4 transition-colors hover:bg-zinc-900/30 ${deletingId === report.id ? 'opacity-50 pointer-events-none' : ''}`}
                 onMouseEnter={() => setHoveredId(report.id)}
                 onMouseLeave={() => setHoveredId(null)}
               >
@@ -550,9 +663,13 @@ export function DashboardClient({
 
                   {/* Title & Type Info */}
                   <div className="min-w-0 py-1.5">
-                    <h3 className="font-semibold text-sm text-zinc-100 group-hover:text-white truncate">
-                      {report.title || 'Untitled Recording'}
-                    </h3>
+                    {renamingId === report.id ? (
+                      renderRenameInput(report, 'w-full bg-zinc-900 border border-zinc-700 text-zinc-100 rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:border-blue-500')
+                    ) : (
+                      <h3 className="font-semibold text-sm text-zinc-100 group-hover:text-white truncate">
+                        {report.title || 'Untitled Recording'}
+                      </h3>
+                    )}
                     
                     <div className="flex items-center gap-2 mt-2">
                       {/* Mini Type Badge */}
@@ -596,6 +713,9 @@ export function DashboardClient({
                     <Clock size={11} className="text-zinc-500" />
                     <span>{formatDateTime(report.created_at)}</span>
                   </div>
+
+                  {/* Owner-only actions */}
+                  {isOwner && renamingId !== report.id && renderReportMenu(report)}
 
                 </div>
               </a>

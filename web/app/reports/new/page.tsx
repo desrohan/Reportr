@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { useEffect, useRef, useState, useCallback, useSyncExternalStore, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ReportReplayViewer } from "../components/ReportReplayViewer";
 
 interface RawEvent {
   type: number;
-  data: { plugin?: any; payload?: any; href?: string };
+  data: { plugin?: "network" | "console" | "click"; payload?: unknown; href?: string };
   timestamp: number;
 }
 
@@ -23,7 +23,9 @@ interface ReportDraft {
 
 function useDraft(draftId: string | null) {
   const [draft, setDraft] = useState<ReportDraft | null>(null);
-  const [missing, setMissing] = useState(false);
+  // No draftId means there is nothing to poll — start in the missing state
+  // instead of flipping it in an effect after mount.
+  const [missing, setMissing] = useState(() => !draftId);
   const ready = useRef(false);
 
   const poll = useCallback(() => {
@@ -31,7 +33,7 @@ function useDraft(draftId: string | null) {
   }, [draftId]);
 
   useEffect(() => {
-    if (!draftId) { setMissing(true); return; }
+    if (!draftId) return;
     
     const handler = (ev: MessageEvent) => {
       if (ev.source !== window || ev.data?.type !== "REPORTR_DRAFT_RESULT") return;
@@ -57,12 +59,17 @@ function useDraft(draftId: string | null) {
   return { draft, missing: isTrulyMissing };
 }
 
+// SSR-safe mounted check: false on the server and during hydration, true on
+// the client afterwards (subscribing to nothing — the value never changes).
+const subscribeMounted = () => () => {};
+const getMounted = () => true;
+const getServerMounted = () => false;
+
 function NewReportInner() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
 
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const mounted = useSyncExternalStore(subscribeMounted, getMounted, getServerMounted);
 
   const { draft, missing } = useDraft(mounted ? draftId : null);
 

@@ -3,7 +3,7 @@
 import { createClient } from '../../../utils/supabase/server'
 import { redirect } from 'next/navigation'
 
-export async function acceptInvite(code: string, formData: FormData) {
+export async function acceptInvite(code: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

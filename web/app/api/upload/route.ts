@@ -52,8 +52,9 @@ export async function POST(req: Request) {
     )
 
     return NextResponse.json({ uploadUrl, key, publicUrl: buildPublicUrl(cfg, key) })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Presigned URL error:', error)
-    return NextResponse.json({ error: error.message || 'Failed to presign upload' }, { status: 500 })
+    const message = error instanceof Error && error.message ? error.message : 'Failed to presign upload'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

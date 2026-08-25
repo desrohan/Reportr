@@ -1,6 +1,21 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+
+// Reduced-motion preference as an external store: server snapshot is `false`
+// (so SSR and first client render match), the client snapshot reads matchMedia,
+// and the subscription keeps it in sync if the OS setting changes.
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    },
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => false
+  )
+}
 
 /**
  * Reveals its children with a gentle rise the first time they scroll into view.
@@ -18,20 +33,18 @@ export function Reveal({
   as?: 'div' | 'section' | 'li'
 }) {
   const ref = useRef<HTMLElement | null>(null)
-  const [shown, setShown] = useState(false)
+  const [intersected, setIntersected] = useState(false)
+  const prefersReduced = usePrefersReducedMotion()
+  const shown = intersected || prefersReduced
 
   useEffect(() => {
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReduced) {
-      setShown(true)
-      return
-    }
+    if (prefersReduced) return
     const el = ref.current
     if (!el) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setShown(true)
+          setIntersected(true)
           observer.disconnect()
         }
       },
@@ -39,7 +52,7 @@ export function Reveal({
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [prefersReduced])
 
   return (
     <Tag

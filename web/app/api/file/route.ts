@@ -79,7 +79,7 @@ export async function GET(req: Request) {
       .select('workspaces(r2_public_domain)')
       .eq('user_id', user.id)
     for (const m of memberships || []) {
-      const ws = (m as any).workspaces
+      const ws = (m as { workspaces?: { r2_public_domain?: string | null } | null }).workspaces
       const h = hostnameOf(ws?.r2_public_domain)
       if (h) allowed.add(h)
     }

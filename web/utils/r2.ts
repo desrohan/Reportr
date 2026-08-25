@@ -1,4 +1,5 @@
 import { S3Client } from '@aws-sdk/client-s3'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 
 /**
  * Server-side R2 credential resolution shared by the upload routes. Order of
@@ -32,10 +33,10 @@ export function cleanR2Endpoint(endpoint: string): string {
   return endpoint.trim()
 }
 
-// `supabase` is the request-scoped client (typed loosely to avoid coupling to
-// the SSR/JS client union).
+// `supabase` is the request-scoped client (typed loosely as a plain
+// SupabaseClient to avoid coupling to the SSR/JS client union).
 export async function resolveR2Config(
-  supabase: any,
+  supabase: SupabaseClient,
   userId: string,
   workspaceId?: string | null
 ): Promise<R2Config> {
@@ -104,9 +105,9 @@ export function buildPublicUrl(cfg: R2Config, key: string): string {
 /** Authenticate via bearer token (extension) or cookie session (web). */
 export async function authFromRequest(
   req: Request,
-  createServerClient: () => Promise<any>,
-  createTokenClient: (token: string) => any
-): Promise<{ user: any; supabase: any }> {
+  createServerClient: () => Promise<SupabaseClient>,
+  createTokenClient: (token: string) => SupabaseClient
+): Promise<{ user: User | null; supabase: SupabaseClient }> {
   const token = req.headers.get('Authorization')?.split(' ')[1]
   if (token) {
     const supabase = createTokenClient(token)

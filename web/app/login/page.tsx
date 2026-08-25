@@ -1,7 +1,5 @@
 'use client'
 
-import { createClient } from '@/utils/supabase/client' // wait, earlier I used relative paths, here I should use relative paths to be safe unless I'm sure tsconfig has @ configured. Let me look at tsconfig to see if `@/` works. Actually, standard nextjs 14+ sets up `@/*` alias by default. But let's use relative path `../../utils/supabase/client` just in case.
-
 import { createClient as createSupabaseClient } from '../../utils/supabase/client'
 import { useState } from 'react'
 

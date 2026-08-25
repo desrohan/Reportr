@@ -47,6 +47,10 @@ export default async function ReportPage({ params }: PageProps) {
     notFound();
   }
 
+  // Determine whether the visitor is the report's creator (controls rename).
+  const { data: { user } } = await supabase.auth.getUser();
+  const isOwner = !!user && user.id === report.created_by;
+
   // 2. Fetch the report events
   const { data: dbEvents, error: eventsError } = await supabase
     .from("report_events")
@@ -59,7 +63,7 @@ export default async function ReportPage({ params }: PageProps) {
   }
 
   // Reconstruct events as RawEvents from JSONB column
-  const events = (dbEvents || []).map((row: any) => row.data);
+  const events = (dbEvents || []).map((row) => row.data);
 
   return (
     <ReportReplayViewer
@@ -67,6 +71,8 @@ export default async function ReportPage({ params }: PageProps) {
       videoUrl={report.video_url || ""}
       events={events}
       isDraft={false}
+      reportId={id}
+      isOwner={isOwner}
     />
   );
 }

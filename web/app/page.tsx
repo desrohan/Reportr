@@ -17,7 +17,7 @@ import {
   Pin,
 } from 'lucide-react'
 import { createClient } from '../utils/supabase/server'
-import { AuthSync } from './dashboard/AuthSync'
+import { AuthSync, type AuthSyncWorkspace } from './dashboard/AuthSync'
 import { Logo } from './components/Logo'
 import { Reveal } from './components/landing/Reveal'
 import { CopyCommand } from './components/landing/CopyCommand'
@@ -125,13 +125,17 @@ export default async function LandingPage({
   // If a signed-in user lands here, sync their workspaces to the extension too.
   // Without this, AuthSync would push an empty workspace list and wipe the
   // dropdown in the extension popup (breaking capture's workspace context).
-  let workspaces: any[] = []
+  let workspaces: AuthSyncWorkspace[] = []
   if (user) {
     const { data: userWorkspaces } = await supabase
       .from('workspace_members')
       .select('*, workspaces(*)')
       .eq('user_id', user.id)
-    workspaces = (userWorkspaces || []).map((wm: any) => ({
+    workspaces = (userWorkspaces || []).map((wm: {
+      workspace_id: string
+      role: string
+      workspaces: { name: string; invite_code: string } | null
+    }) => ({
       id: wm.workspace_id,
       name: wm.workspaces?.name,
       role: wm.role,

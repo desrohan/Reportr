@@ -118,6 +118,6 @@ function cleanR2Endpoint(endpoint: string): string {
       return `${url.protocol}//${url.hostname}`;
     }
     return url.href.replace(/\/$/, "");
-  } catch (_) {}
+  } catch {}
   return endpoint.trim();
 }

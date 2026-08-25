@@ -24,7 +24,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   // Flatten the workspaces data
-  const workspaces = userWorkspaces.map((wm: any) => ({
+  const workspaces = userWorkspaces.map((wm: {
+    workspace_id: string
+    role: string
+    workspaces: { name: string; invite_code: string }
+  }) => ({
     id: wm.workspace_id,
     name: wm.workspaces.name,
     role: wm.role,

@@ -71,8 +71,8 @@ export function SettingsForm({
         r2_public_domain: workspaceDomain,
       })
       setWorkspaceFeedback({ type: 'success', message: 'Workspace R2 settings saved successfully!' })
-    } catch (err: any) {
-      setWorkspaceFeedback({ type: 'error', message: err.message || 'Failed to save workspace settings.' })
+    } catch (err: unknown) {
+      setWorkspaceFeedback({ type: 'error', message: err instanceof Error && err.message ? err.message : 'Failed to save workspace settings.' })
     } finally {
       setSavingWorkspace(false)
     }
@@ -92,8 +92,8 @@ export function SettingsForm({
         r2_public_domain: personalDomain,
       })
       setPersonalFeedback({ type: 'success', message: 'Personal R2 settings updated successfully!' })
-    } catch (err: any) {
-      setPersonalFeedback({ type: 'error', message: err.message || 'Failed to save personal settings.' })
+    } catch (err: unknown) {
+      setPersonalFeedback({ type: 'error', message: err instanceof Error && err.message ? err.message : 'Failed to save personal settings.' })
     } finally {
       setSavingPersonal(false)
     }
@@ -195,7 +195,7 @@ export function SettingsForm({
               Workspace R2 Storage
             </h2>
             <p className="text-sm text-zinc-400 max-w-2xl">
-              Connect your own Cloudflare R2 bucket. All workspace members' recordings will be uploaded here by default.
+              Connect your own Cloudflare R2 bucket. All workspace members&apos; recordings will be uploaded here by default.
             </p>
           </div>
           {!isOwner && (
